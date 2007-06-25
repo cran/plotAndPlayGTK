@@ -1,0 +1,49 @@
+import(grid)
+import(lattice)
+import(RGtk2) # need to load RGtk2 into search path or myWin$show() doesn't work
+# also cairoDevice doesn't have a namespace so can't be import()ed
+
+# the main function
+export(
+	plotAndPlay,
+	plotAndPlayButtons
+)
+
+# event handlers and supporting functions
+export(
+	.plotAndPlay_close_event,
+	.plotAndPlay_save_event,
+	.plotAndPlay_greyscale_event,
+	.plotAndPlay_zoomin_event,
+	.plotAndPlay_zoomout_event,
+	.plotAndPlay_centre_event,
+	.plotAndPlay_focus_event,
+	.plotAndPlay_identify_event,
+	.plotAndPlay_zero_event,
+	.plotAndPlay_logscale_event,
+	.plotAndPlay_prevpage_event,
+	.plotAndPlay_nextpage_event,
+	plotAndPlayUpdate,
+	plotAndPlayGetToolbar,
+	plotAndPlayGetDA,
+	plotAndPlayMakePrompt,
+	plotAndPlayUnmakePrompt,
+	plotAndPlaySetPrompt
+)
+
+# other GTK GUI stuff
+export(
+	guiDo,
+	errorDialog,
+	infoDialog,
+	questionDialog,
+	guiTextInput,
+	editAsText,
+	setTextview,
+	addTextview,
+	getTextviewText,
+	setTextviewMonospace,
+	choose.file.save,
+	get.extension
+)
+
