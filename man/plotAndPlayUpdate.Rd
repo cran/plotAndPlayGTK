@@ -35,7 +35,6 @@ plotAndPlaySetPrompt(name, text)
 \author{ ~~who you are~~ }
 \note{ ~~further notes~~ 
 
- ~Make other sections like Warning with \section{Warning }{....} ~
 }
 \seealso{ ~~objects to See Also as \code{\link{help}}, ~~~ }
 \examples{
@@ -43,17 +42,6 @@ plotAndPlaySetPrompt(name, text)
 ##-- ==>  Define data, use random,
 ##--	or do  help(data=index)  for the standard data sets.
 
-## The function is currently defined as
-function(name) {
-	result <- eval(.StateEnv$call[[name]])
-	if ("trellis" \%in\% class(result)) {
-		print(result)
-		if (any(.StateEnv$focus[[name]])) {
-			with(.StateEnv$focus[[name]], 
-				trellis.focus("panel", col, row))
-		}
-	}
-  }
 }
 
 \keyword{ utilities }

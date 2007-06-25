@@ -29,7 +29,6 @@ questionDialog(..., isMarkup=F)
 \author{ ~~who you are~~ }
 \note{ ~~further notes~~ 
 
- ~Make other sections like Warning with \section{Warning }{....} ~
 }
 \seealso{ ~~objects to See Also as \code{\link{help}}, ~~~ }
 \examples{
@@ -37,10 +36,6 @@ questionDialog(..., isMarkup=F)
 ##-- ==>  Define data, use random,
 ##--	or do  help(data=index)  for the standard data sets.
 
-## The function is currently defined as
-function(...) {
-	guiMessageDialog(type="error", ...)
-  }
 }
 
 \keyword{ utilities }

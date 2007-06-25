@@ -1,9 +1,11 @@
 \name{plotAndPlayGTK-internal}
 \alias{.plotAndPlay_close_event}
 \alias{.plotAndPlay_save_event}
+\alias{.plotAndPlay_copy_event}
 \alias{.plotAndPlay_greyscale_event}
 \alias{.plotAndPlay_zoomin_event}
 \alias{.plotAndPlay_zoomout_event}
+\alias{.plotAndPlay_zoomfit_event}
 \alias{.plotAndPlay_centre_event}
 \alias{.plotAndPlay_focus_event}
 \alias{.plotAndPlay_identify_event}

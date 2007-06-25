@@ -32,7 +32,6 @@ setTextviewMonospace(tv)
 \author{ ~~who you are~~ }
 \note{ ~~further notes~~ 
 
- ~Make other sections like Warning with \section{Warning }{....} ~
 }
 \seealso{ ~~objects to See Also as \code{\link{help}}, ~~~ }
 \examples{
@@ -40,13 +39,6 @@ setTextviewMonospace(tv)
 ##-- ==>  Define data, use random,
 ##--	or do  help(data=index)  for the standard data sets.
 
-## The function is currently defined as
-function(tv, ..., sep="")
-{
-  msg <- paste(sep=sep, ...)
-  if (length(msg) == 0) msg <-""
-  tv$getBuffer()$setText(msg)
-  }
 }
 
 \keyword{ utilities }

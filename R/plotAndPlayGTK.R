@@ -4,7 +4,7 @@
 
 MAJOR <- "0"
 MINOR <- "7"
-REVISION <- unlist(strsplit("$Revision: 16 $", split=" "))[2]
+REVISION <- unlist(strsplit("$Revision: 17 $", split=" "))[2]
 VERSION <- paste(MAJOR, MINOR, REVISION, sep=".")
 COPYRIGHT <- "(c) 2007 Felix Andrews <felix@nfrac.org>, GPL"
 WEBSITE <- "http://code.google.com/p/plotandplay-gtk/"
@@ -40,6 +40,7 @@ plotAndPlayButtons <- alist(
 	identify=list("Identify data", "gtk-info", f=.plotAndPlay_identify_event),
 	zoomin=list("Zoom in", "gtk-zoom-in", f=.plotAndPlay_zoomin_event),
 	zoomout=list("Zoom out", "gtk-zoom-out", f=.plotAndPlay_zoomout_event),
+	zoomfit=list("Zoom to fit", "gtk-zoom-fit", f=.plotAndPlay_zoomfit_event),
 	centre=list("Re-centre", "gtk-jump-to-ltr", f=.plotAndPlay_centre_event),
 	zero=list("Full scale", "gtk-goto-bottom", f=.plotAndPlay_zero_event, isToggle=T),
 	logscale=list("Log scale", "gtk-goto-top", f=.plotAndPlay_logscale_event, isToggle=T),
@@ -47,6 +48,8 @@ plotAndPlayButtons <- alist(
 	prev.page=list("Prev page", "gtk-go-back-ltr", f=.plotAndPlay_prevpage_event),
 	next.page=list("Next page", "gtk-go-forward-ltr", f=.plotAndPlay_nextpage_event)
 )
+
+#gdkPixbufGetFromDrawable(dest = NULL, src, cmap = NULL, src.x, src.y, dest.x, dest.y, width, height)
 #"gtk-index" / "gtk-preferences"
 #"gtk-zoom-100" (relation="iso")
 
@@ -54,7 +57,7 @@ latticeNames <- c("barchart", "bwplot", "cloud", "contourplot", "densityplot",
 	"dotplot", "histogram", "levelplot", "parallel", "qq", "qqmath", "rfs", 
 	"splom", "stripplot", "tmd", "wireframe", "xyplot")
 
-plotAndPlay <- function(expr, name="plot", plot.call, nav.scales=c("x","y"), trans.scales=c("y"), buttons=plotAndPlayButtons[c("identify", "zoomin", "zoomout", "centre")], extra.buttons=plotAndPlayButtons[c("zero")], labels=NULL, identify.call=NULL, is.lattice=(callName %in% latticeNames), eval.args.pattern=".", envir=parent.frame()) {
+plotAndPlay <- function(expr, name="plot", plot.call, nav.scales=c("x","y"), trans.scales=c("y"), buttons=plotAndPlayButtons[c("identify", "zoomin", "zoomout", "zoomfit", "centre")], extra.buttons=plotAndPlayButtons[c("zero")], labels=NULL, identify.call=NULL, is.lattice=(callName %in% latticeNames), eval.args.pattern=".", envir=parent.frame()) {
 	if (!require("cairoDevice", quietly=TRUE)) {
 		stop("Require package 'cairoDevice'")
 	}
@@ -212,6 +215,10 @@ plotAndPlay <- function(expr, name="plot", plot.call, nav.scales=c("x","y"), tra
 		data=list(name=name, ext="ps"))
 	gSignalConnect(saveItemSVG, "activate", .plotAndPlay_save_event, 
 		data=list(name=name, ext="svg"))
+	# copy button
+	copyButton <- gtkToolButtonWithCallback("Copy", "gtk-copy", 
+		f=.plotAndPlay_copy_event, data=list(name=name))
+	theToolbar$insert(copyButton, -1)
 	if (is.lattice) {
 		greyButton <- gtkToolButtonWithCallback("Greyscale", "gtk-print-preview", 
 			f=.plotAndPlay_greyscale_event, data=list(name=name), isToggle=T)
@@ -297,6 +304,30 @@ plotAndPlay <- function(expr, name="plot", plot.call, nav.scales=c("x","y"), tra
 		errorDialog("Unrecognised filename extension")
 		return()
 	}
+}
+
+.plotAndPlay_copy_event <- function(widget, user.data) {
+	name <- user.data$name
+	# disable other plot buttons until this is over
+	plotAndPlayGetToolbar(name)$setSensitive(F)
+	on.exit(plotAndPlayGetToolbar(name)$setSensitive(T))
+	# switch to this device
+	oldDev <- dev.cur()
+	dev.set(.StateEnv$dev[[name]])
+	on.exit(dev.set(oldDev), add=T)
+	# save plot to file
+	filename <- paste(tempfile(), ".png", sep="")
+	mySize <- plotAndPlayGetDA(name)$getAllocation()
+	myWidth <- mySize$width
+	myHeight <- mySize$height
+	myScale <- 1/72
+	myWidth <- myWidth * myScale
+	myHeight <- myHeight * myScale
+	dev.copy(Cairo_png, file=filename, width=myWidth, height=myHeight)
+	dev.off()
+	im <- gdkPixbufNewFromFile(filename)$retval
+	gtkClipboardGet("CLIPBOARD")$setImage(im)
+	file.remove(filename)
 }
 
 .plotAndPlay_greyscale_event <- function(widget, user.data) {
@@ -460,6 +491,26 @@ plotAndPlay <- function(expr, name="plot", plot.call, nav.scales=c("x","y"), tra
 		# convert back from log scale if required (TODO)
 		if (nav.x) { .StateEnv$call[[name]]$xlim <- xlim }
 		if (nav.y) { .StateEnv$call[[name]]$ylim <- ylim }
+	}
+	plotAndPlayUpdate(name)
+}
+
+.plotAndPlay_zoomfit_event <- function(widget, user.data) {
+	name <- user.data$name
+	nav.x <- ("x" %in% .StateEnv$nav.scales[[name]])
+	nav.y <- ("y" %in% .StateEnv$nav.scales[[name]])
+	# disable other plot buttons until this is over
+	plotAndPlayGetToolbar(name)$setSensitive(F)
+	on.exit(plotAndPlayGetToolbar(name)$setSensitive(T))
+	# find existing scales and update call
+	if (.StateEnv$is.lattice[[name]]) {
+		# lattice plot
+		if (nav.x) { .StateEnv$call[[name]]$xlim <- NULL }
+		if (nav.y) { .StateEnv$call[[name]]$ylim <- NULL }
+	} else {
+		# traditional graphics plot
+		if (nav.x) { .StateEnv$call[[name]]$xlim <- NULL }
+		if (nav.y) { .StateEnv$call[[name]]$ylim <- NULL }
 	}
 	plotAndPlayUpdate(name)
 }
@@ -815,7 +866,7 @@ as.POSIXct.numeric <- function(x) {
 	structure(as.numeric(x), class = c("POSIXt", "POSIXct"))
 }
 
-evalCallArgs <- function(myCall, envir=parent.frame(2), pattern=".*") {
+evalCallArgs <- function(myCall, envir=parent.frame(), pattern=".") {
 	for (i in seq(along=myCall)) {
 		if ((mode(myCall) %in% "call") && (i == 1)) {
 			next # don't eval function itself
@@ -823,7 +874,8 @@ evalCallArgs <- function(myCall, envir=parent.frame(2), pattern=".*") {
 		if (length(grep(pattern, deparse(myCall[[i]])))>0) {
 			myCall[[i]] <- eval(myCall[[i]], envir)
 		} else if (mode(myCall[[i]]) %in% c("call","list")) {
-			myCall[[i]] <- evalCallArgs(myCall[[i]], pattern)
+			myCall[[i]] <- evalCallArgs(myCall[[i]], envir=envir,
+				pattern=pattern)
 		}
 	}
 	return(myCall)

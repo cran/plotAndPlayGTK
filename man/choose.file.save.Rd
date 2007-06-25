@@ -31,7 +31,6 @@ get.extension(path)
 \author{ ~~who you are~~ }
 \note{ ~~further notes~~ 
 
- ~Make other sections like Warning with \section{Warning }{....} ~
 }
 \seealso{ ~~objects to See Also as \code{\link{help}}, ~~~ }
 \examples{
@@ -39,42 +38,6 @@ get.extension(path)
 ##-- ==>  Define data, use random,
 ##--	or do  help(data=index)  for the standard data sets.
 
-## The function is currently defined as
-function(default="", caption="Save File", filters=Filters[c("All"),], index=0) {
-	dialog <- gtkFileChooserDialog(caption, NULL, "save",
-		"gtk-cancel", GtkResponseType["cancel"],
-		"gtk-save", GtkResponseType["accept"])
-	dialog$setCurrentName(default)
-	
-	if (length(filters)==2) {
-		filters <- matrix(filters, nrow=1, ncol=2)
-	}
-	
-	for (i in seq(1, nrow(filters))) {
-		ff <- gtkFileFilterNew()
-		ff$setName(filters[i,1])
-		for (x in strsplit(filters[i,2], ';')[[1]]) {
-			ff$addPattern(x)
-		}
-		dialog$addFilter(ff)
-		if (i == index) { dialog$setFilter(ff) }
-	}
-	
-	#dialog$setDoOverwriteConfirmation(T) crap, appears behind filechooser
-	if (dialog$run() == GtkResponseType["accept"]) {
-		filename <- dialog$getFilename()
-		if (file.exists(filename)) {
-			if (is.null(questionDialog("Replace existing file?"))) {
-				filename <- NA
-			}
-		}
-		dialog$destroy()
-		return(filename)
-	} else {
-		dialog$destroy()
-		return(NA)
-	}
-  }
 }
 
 \keyword{ file }

@@ -6,7 +6,7 @@
   Open a GTK window to view and interact with a plot.
 }
 \usage{
-plotAndPlay(expr, name = "plot", plot.call, nav.scales = c("x","y"), trans.scales = c("y"), buttons = plotAndPlayButtons[c("identify", "zoomin", "zoomout", "centre")], extra.buttons = plotAndPlayButtons[c("zero")], labels = NULL, identify.call = NULL, is.lattice = (callName \%in\% latticeNames), eval.args.pattern = ".", envir = parent.frame())
+plotAndPlay(expr, name = "plot", plot.call, nav.scales = c("x","y"), trans.scales = c("y"), buttons = plotAndPlayButtons[c("identify", "zoomin", "zoomout", "zoomfit", "centre")], extra.buttons = plotAndPlayButtons[c("zero")], labels = NULL, identify.call = NULL, is.lattice = (callName \%in\% latticeNames), eval.args.pattern = ".", envir = parent.frame())
 
 plotAndPlayButtons
 }

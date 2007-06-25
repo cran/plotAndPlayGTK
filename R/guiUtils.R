@@ -76,7 +76,7 @@ guiDo <- function(expr, call, string, doLog=T, doFailureLog=doLog, logFunction=a
 			'</tt>\n\n',
 			'If this is not your fault, you might want to select',
 			'this text and copy it into a bug report.',
-			' [R=', vRSimple, ']'))
+			' [R=', vRSimple, ']'), isMarkup=T)
 	}
 	if (inherits(result, "error") && doFailureLog) {
 		logFunction("# FAILED")

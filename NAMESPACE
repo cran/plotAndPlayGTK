@@ -13,9 +13,11 @@ export(
 export(
 	.plotAndPlay_close_event,
 	.plotAndPlay_save_event,
+	.plotAndPlay_copy_event,
 	.plotAndPlay_greyscale_event,
 	.plotAndPlay_zoomin_event,
 	.plotAndPlay_zoomout_event,
+	.plotAndPlay_zoomfit_event,
 	.plotAndPlay_centre_event,
 	.plotAndPlay_focus_event,
 	.plotAndPlay_identify_event,
