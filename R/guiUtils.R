@@ -1,11 +1,13 @@
-## plotAndPlayGTK: interactive plots in R using GTK
+## plotAndPlayGTK: interactive plots in R using GTK+
 ##
-## Copyright (c) 2007 Felix Andrews <felix@nfrac.org>, GPL
-## some of these functions are based on ones in Rattle v2.1
+## Copyright (c) 2007 Felix Andrews <felix@nfrac.org> and others
+## GPL version 2 or newer
+##
+## Some of these functions are based on ones in Rattle v2.1
 ## Copyright (c) 2006 Graham Williams, Togaware.com, GPL Version 2
 ## Graham.Williams@togaware.com
 
-# generally useful GTK GUI things
+# generally useful RGtk2 GUI things
 
 guiDo <- function(expr, call, string, doLog=T, doFailureLog=doLog, logFunction=addToLog, doFailureDialog=T, doStop=T, envir=if (doLog) .GlobalEnv else parent.frame()) {
 	if (missing(expr) + missing(call) + missing(string) != 2) {
@@ -46,44 +48,47 @@ guiDo <- function(expr, call, string, doLog=T, doFailureLog=doLog, logFunction=a
 			logFunction(callPretty)
 		}
 	}
+	# set up error handler
+	handleIt <- function(e) {
+		# show error dialog
+		if (doFailureDialog) {
+			commandText <- if (isString) { string } else { deparse(call) }
+			msgText <- conditionMessage(e)
+			callText <- deparse(conditionCall(e), width.cutoff=500)[1]
+			if (length(msgText)==0) { msgText <- "" }
+			if (length(callText)==0) { callText <- "" }
+			errorDialog(paste(sep='',
+				'A command has failed. The error was:',
+				'\n\n<span foreground="#aa0000">', 
+					pangoEscape(msgText),
+				'</span>\n\n',
+				'The error occurred in: \n\n<tt>',
+					pangoEscape(callText), 
+				'</tt>\n\n', 
+				'The original command was: \n\n<tt>',
+					pangoEscape(commandText), 
+				'</tt>\n\n',
+				'If this is not your fault, you might want to select ',
+				'this text and copy it into a bug report. Please also ',
+				'include the output from <tt>sessionInfo()</tt>'),
+				isMarkup=T)
+		}
+		if (doFailureLog) {
+			logFunction("# FAILED")
+		}
+		# propagate the error
+		if (doStop) {
+			stop(e)
+		}
+		return(e)
+	}
 	# evaluate it
 	if (isString) {
 		result <- tryCatch(eval(parse(text=string), envir=envir), 
-			error=function(e)e)
+			error=handleIt)
 	} else {
 		result <- tryCatch(eval(call, envir=envir), 
-			error=function(e)e)
-	}
-	# show error dialog
-	if (inherits(result, "error") && doFailureDialog) {
-		setStatusBar("")
-		commandText <- if (isString) { string } else { deparse(call) }
-		msgText <- conditionMessage(result)
-		callText <- deparse(conditionCall(result), width.cutoff=500)[1]
-		if (length(msgText)==0) { msgText <- "" }
-		if (length(callText)==0) { callText <- "" }
-		vRSimple <- paste(R.version$major, R.version$minor, sep='.')
-		errorDialog(paste(sep='',
-			'A command has failed. The error was:',
-			'\n\n<span foreground="#aa0000">', 
-				pangoEscape(msgText),
-			'</span>\n\n',
-			'The error occurred in: \n\n<tt>',
-				pangoEscape(callText), 
-			'</tt>\n\n', 
-			'The original command was: \n\n<tt>',
-				pangoEscape(commandText), 
-			'</tt>\n\n',
-			'If this is not your fault, you might want to select',
-			'this text and copy it into a bug report.',
-			' [R=', vRSimple, ']'), isMarkup=T)
-	}
-	if (inherits(result, "error") && doFailureLog) {
-		logFunction("# FAILED")
-	}
-	# propagate the error
-	if (inherits(result, "error") && doStop) {
-		stop(result)
+			error=handleIt)
 	}
 	return(result)
 }
@@ -239,6 +244,8 @@ setTextviewMonospace <- function(tv)
 {
   tv$modifyFont(pangoFontDescriptionFromString("monospace 10"))
 }
+
+Filters <- structure(c("R or S files (*.R,*.q,*.ssc,*.S)", "Postscript files (*.ps)", "PDF files (*.pdf)", "Png files (*.png)",  "Jpeg files (*.jpeg,*.jpg)",  "Text files (*.txt)", "R images (*.RData,*.rda)", "Zip files (*.zip)",  "All files (*.*)", "*.R;*.q;*.ssc;*.S", "*.ps", "*.pdf",  "*.png", "*.jpeg;*.jpg", "*.txt", "*.RData;*.rda", "*.zip",  "*.*"), .Dim = c(9L, 2L), .Dimnames = list(c("R", "ps",  "pdf", "png", "jpeg", "txt", "RData", "zip", "All"), NULL))
 
 # returns character string, or NA if cancelled
 choose.file.save <- function(default="", caption="Save File", filters=Filters[c("All"),], index=0) {

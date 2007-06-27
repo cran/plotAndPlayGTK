@@ -8,7 +8,9 @@
 \alias{.plotAndPlay_zoomfit_event}
 \alias{.plotAndPlay_centre_event}
 \alias{.plotAndPlay_focus_event}
+\alias{.plotAndPlay_expand_event}
 \alias{.plotAndPlay_identify_event}
+\alias{.plotAndPlay_brush_event}
 \alias{.plotAndPlay_zero_event}
 \alias{.plotAndPlay_logscale_event}
 \alias{.plotAndPlay_prevpage_event}
