@@ -31,7 +31,7 @@ plotAndPlayButtons
   \code{plotAndPlay} works best with Lattice plots. There is only basic support for traditional graphics plots.
   
   Each element of \code{buttons} is a named list passed as arguments to 
-  \code{function(label, icon.name=NULL, f, data=NULL, isToggle=F)}, with:
+  \code{function(label, icon.name=NULL, f, data=list(), isToggle=F)}, with:
   \describe{
   \item{label}{ the button label. }
   \item{icon.name}{ name of the GTK icon to use, starting with "gtk-". See \url{http://developer.gnome.org/doc/API/2.0/gtk/gtk-Stock-Items.html\#GTK-STOCK-ABOUT:CAPS} for a list. }
@@ -63,9 +63,9 @@ require(lattice)
 plotAndPlay(xyplot(Income ~ Population / Area | state.region, 
 	data=data.frame(state.x77)))
 
-## same plot with one panel per page
+## same plot with two panels per page
 plotAndPlay(xyplot(Income ~ Population / Area | state.region, 
-	data=data.frame(state.x77), layout=c(0,1)), name="other")
+	data=data.frame(state.x77), layout=c(2,1)), name="other")
 
 ## time series plot: navigate x-axis only, transform y-axis
 treering2 <- window(treering, 0, 1979)
@@ -78,6 +78,9 @@ str(as.list(plotAndPlayGTK:::StateEnv[["plot"]]$call))
 
 # simple brushing is possible, thanks to Deepayan Sarkar
 plotAndPlay(splom(environmental))
+
+# simple spin and zoom for 3D plots
+plotAndPlay(wireframe(volcano))
 
 }
 }
