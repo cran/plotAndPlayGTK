@@ -6,7 +6,7 @@
 
 MAJOR <- "0"
 MINOR <- "8"
-REVISION <- unlist(strsplit("$Revision: 22 $", split=" "))[2]
+REVISION <- unlist(strsplit("$Revision: 24 $", split=" "))[2]
 VERSION <- paste(MAJOR, MINOR, REVISION, sep=".")
 COPYRIGHT <- paste("(c) 2007 Felix Andrews <felix@nfrac.org>",
 	"with contributions from Deepayan Sarkar and Graham Williams")
@@ -54,19 +54,21 @@ plotAndPlayButtons <- alist(
 )
 
 #gdkPixbufGetFromDrawable(dest = NULL, src, cmap = NULL, src.x, src.y, dest.x, dest.y, width, height)
-#"gtk-index" / "gtk-preferences"
-#"gtk-find"
+#"gtk-index" (layers)
+#"gtk-preferences" (plot type - smooth, symbol, etc?)
+#"gtk-find" (identify label grep)
 #"gtk-italic" (edit labels/titles)
-#"gtk-undo-ltr"
-#"gtk-go-down"
+#"gtk-undo-ltr" (undo)
+#"gtk-go-down" (fly down 3d)
 # TODO: xlim / ylim list if scales$relation %in% c("free", "sliced")
+# TODO: transform data in formula - powers
 
 latticeNames <- c("barchart", "bwplot", "cloud", "contourplot", "densityplot", 
 	"dotplot", "histogram", "levelplot", "parallel", "qq", "qqmath", "rfs", 
 	"splom", "stripplot", "tmd", "wireframe", "xyplot")
 
 
-plotAndPlay <- function(expr, name="plot", plot.call, nav.scales=c("x","y"), trans.scales=c("y"), buttons=plotAndPlayButtons[c("identify", "zoomin", "zoomout", "zoomfit", "centre")], extra.buttons=plotAndPlayButtons[c("zero")], labels=NULL, identify.call=NULL, is.lattice=(callName %in% latticeNames), eval.args=F, envir=parent.frame()) {
+plotAndPlay <- function(expr, name="plot", plot.call, nav.scales=c("x","y"), trans.scales=c("y"), buttons=plotAndPlayButtons[c("identify", "zoomin", "zoomout", "zoomfit", "centre")], extra.buttons=plotAndPlayButtons[c("zero")], labels=NULL, identify.call=NULL, is.lattice=(callName %in% latticeNames), eval.args=F, envir=parent.frame(), restore.on.close=NULL) {
 	if (!require("cairoDevice", quietly=TRUE)) {
 		stop("Require package 'cairoDevice'")
 	}
@@ -145,9 +147,16 @@ plotAndPlay <- function(expr, name="plot", plot.call, nav.scales=c("x","y"), tra
 	# put identify call into canonical form
 	identify.call <- match.call(eval(identify.call[[1]]), identify.call)
 	# check whether the window already exists
-	if (is.null(StateEnv[[name]])) {
+	if (is.null(StateEnv[[name]]$win) 
+	|| (inherits(StateEnv[[name]]$win, "<invalid>"))) {
 		# create a new GTK window and set up cairoDevice for plotting
 		myWin <- gtkWindow(show=FALSE)
+		if (!inherits(myWin, "GtkWindow")) {
+			stop(paste("Could not create the GTK window.",
+				"Make sure you have recent versions of",
+				"RGtk2 and the GTK+ libraries.",
+				"See http://www.ggobi.org/rgtk2/"))
+		}
 		myWin[["default-width"]] <- 640
 		myWin[["default-height"]] <- 480
 		myWin[["title"]] <- paste("plotAndPlay:", name)
@@ -302,11 +311,13 @@ plotAndPlay <- function(expr, name="plot", plot.call, nav.scales=c("x","y"), tra
 		call=plot.call,
 		id.call=identify.call,
 		ids=list(),
+		brushed=list(),
 		focus=list(col=0, row=0),
 		nav.scales=nav.scales,
 		trans.scales=trans.scales,
 		is.lattice=is.lattice,
-		page=1
+		page=1,
+		restore.on.close=restore.on.close
 	)
 	# do the plot
 	invisible(plotAndPlayUpdate(name))
@@ -316,10 +327,13 @@ plotAndPlay <- function(expr, name="plot", plot.call, nav.scales=c("x","y"), tra
 	name <- user.data$name
 	if (is.null(StateEnv[[name]])) { return() }
 	if (StateEnv[[name]]$dev %in% dev.list()) {
-		dev.off(StateEnv[[name]]$dev)
+		try(dev.off(StateEnv[[name]]$dev))
 	}
 	if (!is.null(StateEnv[[name]]$win)) {
-		StateEnv[[name]]$win$destroy()
+		try(StateEnv[[name]]$win$destroy())
+	}
+	if (!is.null(StateEnv[[name]]$restore.on.close)) {
+		try(StateEnv[[name]]$restore.on.close$present())
 	}
 	rm(list=name, envir=StateEnv)
 }
@@ -684,7 +698,7 @@ plotAndPlay <- function(expr, name="plot", plot.call, nav.scales=c("x","y"), tra
 	plotAndPlayMakePrompt(name)
 	on.exit(plotAndPlayUnmakePrompt(name), add=T)
 	plotAndPlaySetPrompt(name, "Click on a panel to focus on (for further interaction)")
-	newFocus <- trellis.clickFocus()
+	newFocus <- trellis.focus()
 	if (!is.null(newFocus)) {
 		StateEnv[[name]]$focus <- newFocus
 	}
@@ -706,7 +720,7 @@ plotAndPlay <- function(expr, name="plot", plot.call, nav.scales=c("x","y"), tra
 		plotAndPlayMakePrompt(name)
 		on.exit(plotAndPlayUnmakePrompt(name), add=T)
 		plotAndPlaySetPrompt(name, "Click on a panel to expand (for further interaction)")
-		newFocus <- trellis.clickFocus(highlight=F)
+		newFocus <- trellis.focus()
 		if (!any(newFocus)) { return() }
 		StateEnv[[name]]$focus <- list(col=0, row=0)
 		StateEnv[[name]]$old.call.layout <- StateEnv[[name]]$call$layout
@@ -858,7 +872,11 @@ plotAndPlay <- function(expr, name="plot", plot.call, nav.scales=c("x","y"), tra
 	if (!any(newFocus)) { return() }
 	plotAndPlaySetPrompt(name, paste("Brushing data points...",
 		"Click the right mouse button to finish."))
-	panel.brush.splom(verbose=F)
+	brushed.new <- panel.brush.splom()
+	myPacket <- as.character(packet.number())
+	brushed.old <- StateEnv[[name]]$brushed[[myPacket]]
+	if (!is.null(brushed.old)) { brushed.new <- union(brushed.new, brushed.old) }
+	StateEnv[[name]]$brushed[[myPacket]] <- brushed.new
 	if (!any(StateEnv[[name]]$focus)) { trellis.unfocus() }
 }
 
@@ -1032,8 +1050,8 @@ plotAndPlay <- function(expr, name="plot", plot.call, nav.scales=c("x","y"), tra
 
 .plotAndPlay_clear_event <- function(widget, user.data) {
 	name <- user.data$name
-	StateEnv[[name]]$ids <- NULL
-	StateEnv[[name]]$brushed <- NULL
+	StateEnv[[name]]$ids <- list()
+	StateEnv[[name]]$brushed <- list()
 	plotAndPlayUpdate(name)
 }
 
@@ -1069,17 +1087,17 @@ plotAndPlay <- function(expr, name="plot", plot.call, nav.scales=c("x","y"), tra
 		}
 		if (trans.x) {
 			if (min(xlim) > 0) {
-				xlim[which.min(xlim)] <- 0 - 0.05 * max(abs(xlim))
+				xlim[which.min(xlim)] <- 0 - 0.07 * max(abs(xlim))
 			} else if (max(xlim) < 0) {
-				xlim[which.max(xlim)] <- 0 + 0.05 * max(abs(xlim))
+				xlim[which.max(xlim)] <- 0 + 0.07 * max(abs(xlim))
 			}
 			StateEnv[[name]]$call$xlim <- xlim
 		}
 		if (trans.y) {
 			if (min(ylim) > 0) {
-				ylim[which.min(ylim)] <- 0 - 0.05 * max(abs(ylim))
+				ylim[which.min(ylim)] <- 0 - 0.07 * max(abs(ylim))
 			} else if (max(ylim) < 0) {
-				ylim[which.max(ylim)] <- 0 + 0.05 * max(abs(ylim))
+				ylim[which.max(ylim)] <- 0 + 0.07 * max(abs(ylim))
 			}
 			StateEnv[[name]]$call$ylim <- ylim
 		}
@@ -1125,7 +1143,7 @@ plotAndPlay <- function(expr, name="plot", plot.call, nav.scales=c("x","y"), tra
 
 .plotAndPlay_zoomout3d_event <- function(widget, user.data) {
 	name <- user.data$name
-	StateEnv[[name]]$call$zoom <- StateEnv[[name]]$call$zoom * 0.667
+	StateEnv[[name]]$call$zoom <- StateEnv[[name]]$call$zoom / 1.5
 	plotAndPlayUpdate(name)
 }
 
@@ -1164,7 +1182,7 @@ plotAndPlayDoFocus <- function(name, highlight=T, ...) {
 		} else {
 			plotAndPlaySetPrompt(name, "First, choose a panel")
 		}
-		tmp <- trellis.clickFocus(highlight=highlight, ...)
+		tmp <- trellis.focus(highlight=highlight, ...)
 		return(tmp)
 	}
 }
@@ -1348,109 +1366,6 @@ deviceNPCToVp <- function(pos, unit="native", valueOnly=FALSE) {
 		y=convertY(location[2], unit, valueOnly=valueOnly))
 }
 
-# this will be available in lattice package soon
-
-trellis.clickFocus <- function(...) {
-	layoutMatrix <- trellis.currentLayout()
-	if (sum(layoutMatrix > 0) == 1) {
-		w <- which(layoutMatrix > 0)
-		focusRow <- row(layoutMatrix)[w]
-		focusCol <- col(layoutMatrix)[w]
-		trellis.focus("panel", focusCol, focusRow, ...)
-		return(invisible(list(col=focusCol, row=focusRow)))
-	}
-	currVpp <- current.vpPath()
-	if (!is.null(currVpp)) { upViewport(currVpp$n) }
-	depth <- downViewport(trellis.vpname("panel", 1, 1))
-	colRange <- current.viewport()$layout.pos.col[1]
-	rowRange <- current.viewport()$layout.pos.row[1]
-	upViewport()
-	downViewport(trellis.vpname("panel", ncol(layoutMatrix), nrow(layoutMatrix)))
-	colRange[2] <- current.viewport()$layout.pos.col[1]
-	rowRange[2] <- current.viewport()$layout.pos.row[1]
-	upViewport()
-	layCols <- current.viewport()$layout$ncol
-	layRows <- current.viewport()$layout$nrow
-	leftPad <- convertX(sum(current.viewport()$layout$widths[1:(min(colRange)-1)]), "npc", TRUE)
-	rightPad <- convertX(sum(current.viewport()$layout$widths[(max(colRange)+1):layCols]), "npc", TRUE)
-	topPad <- convertY(sum(current.viewport()$layout$heights[1:(min(rowRange)-1)]), "npc", TRUE)
-	botPad <- convertY(sum(current.viewport()$layout$heights[(max(rowRange)+1):layRows]), "npc", TRUE)
-	clickLoc <- grid.locator("npc")
-	# reset current viewport so lattice doesn't get confused
-	upViewport(depth-1)
-	if (!is.null(currVpp)) { downViewport(currVpp) }
-	if (is.null(clickLoc)) {
-		return(NULL)
-	}
-	clickLoc <- lapply(clickLoc, as.numeric)
-	clickXScaled <- (clickLoc$x - leftPad) / (1 - leftPad - rightPad)
-	focusCol <- ceiling(clickXScaled * ncol(layoutMatrix))
-	clickYScaled <- (clickLoc$y - botPad) / (1 - botPad - topPad)
-	focusRow <- ceiling(clickYScaled * nrow(layoutMatrix))
-	if ((focusCol < 1) || (focusCol > ncol(layoutMatrix))
-	 || (focusRow < 1) || (focusRow > nrow(layoutMatrix))) {
-		focusCol <- focusRow <- 0
-		trellis.unfocus()
-	} else {
-		# TODO: if as.table == T need to flip row
-		trellis.focus("panel", focusCol, focusRow, ...)
-	}
-	invisible(list(col=focusCol, row=focusRow))
-}
-
-### wrapper around panel.identify meant to work with qqmath.
-
-panel.identify.qqmath <-
-    function(x = panel.args$x,
-             distribution = panel.args$distribution,
-             groups = panel.args$groups, 
-             subscripts = panel.args$subscripts,
-             labels = subscripts, 
-             panel.args = trellis.panelArgs(),
-             ...)
-{
-    x <- as.numeric(x)
-    if (is.null(subscripts)) subscripts <- seq_along(x)
-    labels <- as.character(labels)
-    if (length(labels) > length(subscripts))
-        labels <- labels[subscripts]
-    str(subscripts)
-    str(labels)
-    if (!is.null(panel.args$f.value)) warning("'f.value' not supported; ignoring")
-    distribution <-
-        if (is.function(distribution)) distribution 
-        else if (is.character(distribution)) get(distribution)
-        else eval(distribution)
-    ## compute quantiles corresponding to given vector, possibly
-    ## containing NA's.  The return value must correspond to the
-    ## original order
-    getq <- function(x)
-    {
-        ans <- x
-        id <- !is.na(x)
-        ord <- order(x[id])
-        if (any(id)) ans[id] <- distribution(ppoints(sum(id)))[order(ord)]
-        ans
-    }
-    if (is.null(groups))
-    {
-        ## panel.points(x = getq(x), y = x, pch = ".", col = "red", cex = 3)
-        panel.identify(x = getq(x), y = x, labels = labels, ...)
-    }
-    else
-    {
-        allq <- rep(NA_real_, length(x))
-        subg <- groups[subscripts]
-        vals <- if (is.factor(groups)) levels(groups) else sort(unique(groups))
-        for (i in seq_along(vals))
-        {
-            ok <- !is.na(subg) & (subg == vals[i])
-            allq[ok] <- getq(x[ok])
-        }
-        panel.identify(x = allq, y = x, labels = labels, ...)
-    }
-}
-
 ## The following functions by Deepayan Sarkar <Deepayan.Sarkar@R-project.org>
 
 packet.panel.page <- function(n)
@@ -1463,68 +1378,6 @@ packet.panel.page <- function(n)
                             page = page + n - 1,
                             ...)
    }
-}
-
-panel.brush.splom <-
-    function(threshold = 18, verbose = getOption("verbose"), ...)
-{
-    while (splom.brushPoint(threshold = threshold, verbose = verbose, ...)) {}
-}
-
-splom.brushPoint <-
-    function(pargs = trellis.panelArgs(),
-             threshold = 18,
-             col = 'black', pch = 16, cex = 1, ...,
-             verbose = getOption("verbose"))
-{
-    if (verbose) message("Click to choose one point to highlight")
-    ll <- grid.locator(unit = "npc")
-    if (is.null(ll)) return(FALSE)
-    nvars <- length(pargs$z)
-    ## which subpanel
-    colpos <- ceiling(convertUnit(ll$x, "npc", valueOnly = TRUE) * nvars)
-    rowpos <- ceiling(convertUnit(ll$y, "npc", valueOnly = TRUE) * nvars)
-    if (rowpos == colpos) return(TRUE)
-    subpanel.name <- paste("subpanel", colpos, rowpos, sep = ".")
-    ## coordinates of click in subpanel
-    ll$x <- nvars * (ll$x - unit((colpos-1) / nvars, "npc"))
-    ll$y <- nvars * (ll$y - unit((rowpos-1) / nvars, "npc"))
-    ## get to that viewport, so we can convert units
-    depth <- downViewport(subpanel.name)
-    xnative <- convertX(ll$x, "native", TRUE)
-    ynative <- convertY(ll$y, "native", TRUE)
-    ## find nearest point in data (replicate steps in panel.identify)
-    xpoints <- convertX(unit(xnative, "native"), "points", TRUE)
-    ypoints <- convertY(unit(ynative, "native"), "points", TRUE)
-    data.xp <- convertX(unit(pargs$z[, colpos], "native"), "points", TRUE)
-    data.yp <- convertY(unit(pargs$z[, rowpos], "native"), "points", TRUE)
-    pdists <- sqrt((data.xp - xpoints)^2 + (data.yp - ypoints)^2)
-    if (min(pdists, na.rm = TRUE) > threshold)
-    {
-        if (verbose) warning("no points within ", threshold, " points of click")
-        upViewport(depth)
-    }
-    else
-    {
-        w <- which.min(pdists)
-        if (verbose) print(pargs$z[w,])
-        upViewport(depth)
-        for (row in 1:nvars)
-        for (column in 1:nvars)
-            if (row != column)
-            {
-                subpanel.name <-
-                    paste("subpanel",
-                          column, row, sep = ".")
-                depth <- downViewport(subpanel.name)
-                panel.points(x = pargs$z[w, column],
-                             y = pargs$z[w, row],
-                             pch = pch, col = col, cex = cex,
-                             ...)
-                upViewport(depth)
-            }
-    }
-    return(TRUE)
 }
 
 splom.drawBrushed <- function(ids, pargs=trellis.panelArgs(), threshold=18, col='black', pch=16, cex=1, ...) {
@@ -1543,63 +1396,6 @@ splom.drawBrushed <- function(ids, pargs=trellis.panelArgs(), threshold=18, col=
                              ...)
                 upViewport(depth)
             }
-}
-
-## copied from lattice SVN pending its release...
-
-panel.identify <-
-    function(x, y = NULL,
-             subscripts = seq_along(x),
-             labels = subscripts, 
-             n = length(x), offset = 0.5,
-             threshold = 18, ## in points, roughly 0.25 inches
-             panel.args = trellis.panelArgs(),
-             ...)
-    ## ... goes to ltext
-{
-    if (missing(x))
-    {
-        x <- panel.args$x
-        y <- panel.args$y
-        if (missing(subscripts) && !is.null(panel.args$subscripts))
-            subscripts <- panel.args$subscripts
-    }
-    xy <- xy.coords(x, y, recycle = TRUE)
-    x <- xy$x
-    y <- xy$y
-    px <- convertX(unit(x, "native"), "points", TRUE)
-    py <- convertY(unit(y, "native"), "points", TRUE)
-    labels <- as.character(labels)
-    if (length(labels) > length(subscripts))
-        labels <- labels[subscripts]
-
-    unmarked <- rep(TRUE, length(x))
-    count <- 0
-
-    while (count < n)
-    {
-        ll <- grid.locator(unit = "points")
-        if (is.null(ll)) break ## non-left click
-        lx <- convertX(ll$x, "points", TRUE)
-        ly <- convertY(ll$y, "points", TRUE)
-        pdists <- sqrt((px - lx)^2 + (py - ly)^2)
-        if (min(pdists, na.rm = TRUE) > threshold)
-            warning("no observations within ", threshold, " points")
-        else
-        {
-            w <- which.min(pdists)
-            if (unmarked[w])
-            {
-                pos <- lattice:::getTextPosition(x = lx - px[w], y = ly - py[w])
-                ltext(x[w], y[w], labels[w], pos = pos, offset = offset, ...)
-                unmarked[w] <- FALSE
-                count <- count + 1
-            }
-            else
-                warning("nearest observation already identified")
-        }
-    }
-    subscripts[!unmarked]
 }
 
 

@@ -1,6 +1,7 @@
 \name{choose.file.save}
 \alias{choose.file.save}
 \alias{get.extension}
+\alias{get.stem}
 \title{GTK file save dialog}
 \description{
   ~~ A concise (1-5 lines) description of what the function does. ~~
@@ -9,6 +10,7 @@
 choose.file.save(default = "", caption = "Save File", filters = Filters[c("All"), ], index = 0)
 
 get.extension(path)
+get.stem(path)
 }
 \arguments{
   \item{default}{ ~~Describe \code{default} here~~ }

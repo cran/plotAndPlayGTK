@@ -6,7 +6,7 @@
   Open a GTK+ window to view and interact with a plot.
 }
 \usage{
-plotAndPlay(expr, name = "plot", plot.call, nav.scales = c("x","y"), trans.scales = c("y"), buttons = plotAndPlayButtons[c("identify", "zoomin", "zoomout", "zoomfit", "centre")], extra.buttons = plotAndPlayButtons[c("zero")], labels = NULL, identify.call = NULL, is.lattice = (callName \%in\% latticeNames), eval.args = F, envir = parent.frame())
+plotAndPlay(expr, name = "plot", plot.call, nav.scales = c("x","y"), trans.scales = c("y"), buttons = plotAndPlayButtons[c("identify", "zoomin", "zoomout", "zoomfit", "centre")], extra.buttons = plotAndPlayButtons[c("zero")], labels = NULL, identify.call = NULL, is.lattice = (callName \%in\% latticeNames), eval.args = F, envir = parent.frame(), restore.on.close = NULL)
 
 plotAndPlayButtons
 }
@@ -26,6 +26,7 @@ plotAndPlayButtons
   \item{is.lattice}{ whether the plot is a \link{Lattice} plot, or a traditional graphics plot. If the called function is in the \code{lattice} package it will be recognised automatically. }
   \item{eval.args}{ \code{TRUE}, \code{FALSE}, or a \link[=regex]{regular expression} matching the argument values to evaluate in the plot call. See below. }
   \item{envir}{ \code{\link{environment}} to use in evaluating the call arguments (see \code{eval.args}) }
+  \item{restore.on.close}{ a \code{gtkWindow} to bring to front when the plot window is closed. }
 }
 \details{
   \code{plotAndPlay} works best with Lattice plots. There is only basic support for traditional graphics plots.

@@ -52,7 +52,9 @@ guiDo <- function(expr, call, string, doLog=T, doFailureLog=doLog, logFunction=a
 	handleIt <- function(e) {
 		# show error dialog
 		if (doFailureDialog) {
-			commandText <- if (isString) { string } else { deparse(call) }
+			commandText <- if (isString) { string } else {
+				paste(deparse(call), collapse="\n")
+			}
 			msgText <- conditionMessage(e)
 			callText <- deparse(conditionCall(e), width.cutoff=500)[1]
 			if (length(msgText)==0) { msgText <- "" }
@@ -293,6 +295,13 @@ get.extension <- function(path)
     last <- parts[length(parts)]
   else
     last <- ""
+  last
+}
+
+get.stem <- function(path)
+{
+  parts <- strsplit(basename(path), "\\.")[[1]]
+  last <- paste(parts[1:length(parts)-1], collapse=".")
   last
 }
 
