@@ -1,16 +1,31 @@
-import(grid)
+#Imports: RGtk2 (>= 2.10.13), cairoDevice (>= 2.3)
+# no point in doing this because cairoDevice::asCairoDevice calls 'require(RGtk2)'
+#import(RGtk2)
+#import(cairoDevice)
 import(lattice)
-import(RGtk2) # need to load RGtk2 into search path or myWin$show() doesn't work
-# also cairoDevice doesn't have a namespace so can't be import()ed
+import(grid)
 
 # the main function
 export(
-	plotAndPlay,
-	plotAndPlayButtons
+	plotAndPlay
 )
 
 # event handlers and supporting functions
 export(
+	plotAndPlayButtons,
+	plotAndPlayBasicButtons,
+	quickTool,
+	plotAndPlayGetCurrState,
+	plotAndPlaySetCurrState,
+	plotAndPlayUpdate,
+	plotAndPlayDoFocus,
+	plotAndPlayMakePrompt,
+	plotAndPlayUnmakePrompt,
+	plotAndPlaySetPrompt,
+	plotAndPlayGetToolbar,
+	plotAndPlayGetDA,
+	.plotAndPlay_window_focus_in_event,
+	.plotAndPlay_window_focus_out_event,
 	.plotAndPlay_close_event,
 	.plotAndPlay_save_event,
 	.plotAndPlay_copy_event,
@@ -34,13 +49,7 @@ export(
 	.plotAndPlay_zoomin3d_event,
 	.plotAndPlay_zoomout3d_event,
 	.plotAndPlay_flyleft3d_event,
-	.plotAndPlay_flyright3d_event,
-	plotAndPlayUpdate,
-	plotAndPlayGetToolbar,
-	plotAndPlayGetDA,
-	plotAndPlayMakePrompt,
-	plotAndPlayUnmakePrompt,
-	plotAndPlaySetPrompt
+	.plotAndPlay_flyright3d_event
 )
 
 # other GTK GUI stuff

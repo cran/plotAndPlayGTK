@@ -6,7 +6,7 @@
 
 MAJOR <- "0"
 MINOR <- "8"
-REVISION <- unlist(strsplit("$Revision: 24 $", split=" "))[2]
+REVISION <- unlist(strsplit("$Revision: 33 $", split=" "))[2]
 VERSION <- paste(MAJOR, MINOR, REVISION, sep=".")
 COPYRIGHT <- paste("(c) 2007 Felix Andrews <felix@nfrac.org>",
 	"with contributions from Deepayan Sarkar and Graham Williams")
@@ -31,67 +31,152 @@ WEBSITE <- "http://code.google.com/p/plotandplay-gtk/"
 StateEnv <- new.env()
 
 plotAndPlayButtons <- alist(
-	zoomin=list("Zoom to...", "gtk-zoom-in", f=.plotAndPlay_zoomin_event),
-	zoomout=list("Zoom out", "gtk-zoom-out", f=.plotAndPlay_zoomout_event),
-	zoomfit=list("Fit data", "gtk-zoom-fit", f=.plotAndPlay_zoomfit_event),
-	centre=list("Re-centre", "gtk-jump-to-ltr", f=.plotAndPlay_centre_event),
-	zero=list("Full scale", "gtk-goto-bottom", f=.plotAndPlay_zero_event, isToggle=T),
-	logscale=list("Log scale", "gtk-goto-top", f=.plotAndPlay_logscale_event, isToggle=T),
-	focus=list("Choose panel", "gtk-select-color", f=.plotAndPlay_focus_event),
-	expand=list("Expand panel", "gtk-fullscreen", f=.plotAndPlay_expand_event, isToggle=T),
-	prev.page=list("Prev page", "gtk-go-back-ltr", f=.plotAndPlay_prevpage_event),
-	next.page=list("Next page", "gtk-go-forward-ltr", f=.plotAndPlay_nextpage_event),
-	identify=list("Label points", "gtk-info", f=.plotAndPlay_identify_event),
-	identify.region=list("Label region", "gtk-info", f=.plotAndPlay_identify_region_event),
-	brush=list("Brush points", "gtk-media-record", f=.plotAndPlay_brush_event),
-	brush.region=list("Brush region", "gtk-media-record", f=.plotAndPlay_brush_region_event),
-	brush.drag=list("Brush region (drag)", "gtk-media-record", f=.plotAndPlay_brush_drag_event),
-	clear=list("Clear", "gtk-clear", f=.plotAndPlay_clear_event),
-	zoomin.3d=list("Zoom in", "gtk-zoom-in", f=.plotAndPlay_zoomin3d_event),
-	zoomout.3d=list("Zoom out", "gtk-zoom-out", f=.plotAndPlay_zoomout3d_event),
-	fly.left.3d=list("Fly left", "gtk-media-rewind-ltr", f=.plotAndPlay_flyleft3d_event),
-	fly.right.3d=list("Fly right", "gtk-media-rewind-rtl", f=.plotAndPlay_flyright3d_event)
+	identify=makeIdentifyMenuButton(),
+	identify.simple=quickTool("Label points", "gtk-info", tooltip="Identify data points by clicking on them", f=.plotAndPlay_identify_event),
+	zoomin=quickTool("Zoom to...", "gtk-zoom-in", tooltip="Select plot region with the mouse", f=.plotAndPlay_zoomin_event),
+	zoomout=quickTool("Zoom out", "gtk-zoom-out", f=.plotAndPlay_zoomout_event),
+	zoomfit=quickTool("Fit data", "gtk-zoom-fit", f=.plotAndPlay_zoomfit_event),
+	centre=quickTool("Re-centre", "gtk-jump-to-ltr", f=.plotAndPlay_centre_event),
+	zero=quickTool("Full scale", "gtk-goto-bottom", tooltip="Show the full scale starting from zero", f=.plotAndPlay_zero_event, isToggle=T),
+	logscale=quickTool("Log scale", "gtk-goto-top", tooltip="Use a logarithmic scale (base 10)", f=.plotAndPlay_logscale_event, isToggle=T),
+	brush=quickTool("Brush points", "gtk-media-record", f=.plotAndPlay_brush_event),
+	brush.region=quickTool("Brush region", "gtk-media-record", f=.plotAndPlay_brush_region_event),
+	brush.drag=quickTool("Brush region (drag)", "gtk-media-record", f=.plotAndPlay_brush_drag_event),
+	clear=quickTool("Clear", "gtk-clear", tooltip="Remove labels and annotations", f=.plotAndPlay_clear_event),
+	zoomin.3d=quickTool("Zoom in", "gtk-zoom-in", f=.plotAndPlay_zoomin3d_event),
+	zoomout.3d=quickTool("Zoom out", "gtk-zoom-out", f=.plotAndPlay_zoomout3d_event),
+	fly.left.3d=quickTool("Fly left", "gtk-media-rewind-ltr", f=.plotAndPlay_flyleft3d_event),
+	fly.right.3d=quickTool("Fly right", "gtk-media-rewind-rtl", f=.plotAndPlay_flyright3d_event),
+	focus=quickTool("Choose panel", "gtk-select-color", tooltip="Choose a panel to focus on (for further interaction)", f=.plotAndPlay_focus_event),
+	expand=quickTool("Expand panel", "gtk-fullscreen", tooltip="Choose a panel to expand and focus (for further interaction)", f=.plotAndPlay_expand_event, isToggle=T),
+	prev.page=quickTool("Prev page", "gtk-go-back-ltr", f=.plotAndPlay_prevpage_event),
+	next.page=quickTool("Next page", "gtk-go-forward-ltr", f=.plotAndPlay_nextpage_event)
 )
+
+plotAndPlayBasicButtons <- alist(
+	gtkSeparatorToolItem(),
+	save=makeSaveMenuButton(),
+	copy=quickTool("Copy", "gtk-copy", tooltip="Copy this plot to the clipboard (as a bitmap)", f=.plotAndPlay_copy_event),
+	greyscale=quickTool("Greyscale", "gtk-print-preview", tooltip="Switch to the greyscale lattice theme (then save the plot for printing)", f=.plotAndPlay_greyscale_event, isToggle=T)
+)
+
+quickTool <- function(label, icon.name=NULL, tooltip=NULL, f, data=NULL, isToggle=F) {
+	x <- if (isToggle) gtkToggleToolButton() else gtkToolButton()
+	x[["label"]] <- label
+	x[["icon-name"]] <- icon.name
+	if (!is.null(tooltip)) {
+		thisTips <- gtkTooltips()
+		thisTips$setTip(x, tooltip)
+	}
+	gSignalConnect(x, "clicked", f, data=data)
+	x
+}
+
+makeIdentifyMenuButton <- function() {
+	idButton <- gtkMenuToolButton(gtkImageNewFromStock("gtk-info", 
+		size=GtkIconSize['small-toolbar']), label="Label points")
+	thisTips <- gtkTooltips()
+	thisTips$setTip(idButton, "Identify data points by clicking on them")
+	gSignalConnect(idButton, "clicked", .plotAndPlay_identify_event)
+	idMenu <- gtkMenu()
+	idItemRegion <- gtkMenuItem("Label all points in a region")
+	idItemClear <- gtkMenuItem("Clear labels")
+	idMenu$append(idItemRegion)
+	idMenu$append(idItemClear)
+	idButton$setMenu(idMenu)
+	gSignalConnect(idItemRegion, "activate", .plotAndPlay_identify_region_event)
+	gSignalConnect(idItemClear, "activate", .plotAndPlay_clear_event)
+	idButton
+}
+
+makeSaveMenuButton <- function() {
+	saveButton <- gtkMenuToolButton(gtkImageNewFromStock('gtk-save-as', 
+		size=GtkIconSize['small-toolbar']), label="Save as")
+	gSignalConnect(saveButton, "clicked", .plotAndPlay_save_event)
+	saveMenu <- gtkMenu()
+	saveItemPDF <- gtkMenuItem("PDF")
+	saveItemPNG <- gtkMenuItem("PNG (bitmap)")
+	saveItemPS <- gtkMenuItem("PostScript")
+	saveItemSVG <- gtkMenuItem("SVG")
+	saveMenu$append(saveItemPDF)
+	saveMenu$append(saveItemPNG)
+	saveMenu$append(saveItemPS)
+	saveMenu$append(saveItemSVG)
+	saveButton$setMenu(saveMenu)
+	gSignalConnect(saveItemPDF, "activate", .plotAndPlay_save_event, 
+		data=list(ext="pdf"))
+	gSignalConnect(saveItemPNG, "activate", .plotAndPlay_save_event, 
+		data=list(ext="png"))
+	gSignalConnect(saveItemPS, "activate", .plotAndPlay_save_event, 
+		data=list(ext="ps"))
+	gSignalConnect(saveItemSVG, "activate", .plotAndPlay_save_event, 
+		data=list(ext="svg"))
+	saveButton
+}
+
+# move plotAndPlayUpdate.Rd to plotAndPlayButtons.Rd
+
+# more support for traditional plots:
+# - identify region
+# - 3d?
+
+# get labels from formula rownames
+
+# TODO: transform data in formula - sqrt - `.transform`?
+
+#"gtk-preferences" (plot type, symbol, titles, etc?)
+
+#"gtk-find" (identify label grep)
 
 #gdkPixbufGetFromDrawable(dest = NULL, src, cmap = NULL, src.x, src.y, dest.x, dest.y, width, height)
 #"gtk-index" (layers)
-#"gtk-preferences" (plot type - smooth, symbol, etc?)
-#"gtk-find" (identify label grep)
 #"gtk-italic" (edit labels/titles)
 #"gtk-undo-ltr" (undo)
 #"gtk-go-down" (fly down 3d)
 # TODO: xlim / ylim list if scales$relation %in% c("free", "sliced")
-# TODO: transform data in formula - powers
 
 latticeNames <- c("barchart", "bwplot", "cloud", "contourplot", "densityplot", 
 	"dotplot", "histogram", "levelplot", "parallel", "qq", "qqmath", "rfs", 
 	"splom", "stripplot", "tmd", "wireframe", "xyplot")
 
 
-plotAndPlay <- function(expr, name="plot", plot.call, nav.scales=c("x","y"), trans.scales=c("y"), buttons=plotAndPlayButtons[c("identify", "zoomin", "zoomout", "zoomfit", "centre")], extra.buttons=plotAndPlayButtons[c("zero")], labels=NULL, identify.call=NULL, is.lattice=(callName %in% latticeNames), eval.args=F, envir=parent.frame(), restore.on.close=NULL) {
-	if (!require("cairoDevice", quietly=TRUE)) {
-		stop("Require package 'cairoDevice'")
-	}
+plotAndPlay <- function(expr, name="plot", nav.scales=c("x","y"), trans.scales=c("y"), 
+	buttons=list("identify", "zoomin", "zoomout", "zoomfit", "centre"), 
+	extra.buttons=list("zero"), basic.buttons=plotAndPlayBasicButtons, 
+	labels=NULL, label.args=list(cex=0.7), identify.call=NULL, plot.call, 
+	is.lattice=(callName %in% latticeNames), eval.args=F, envir=parent.frame(), 
+	restore.on.close=NULL) {
+	
+	if (missing(plot.call) == missing(expr)) stop("give only one of 'expr' and 'plot.call'")
 	if (missing(plot.call)) {
 		plot.call <- substitute(expr)
 	}
 	# check types
-	if (!is.call(plot.call)) { stop("'plot.call' should be a call object") }
-	if (!is.character(name)) { stop("'name' should be character") }
+	if (!is.call(plot.call)) stop("'plot.call' should be a call object")
+	if (!is.character(name)) stop("'name' should be character")
 	nav.scales <- match.arg(nav.scales, c("x","y"), several.ok=T)
 	trans.scales <- match.arg(trans.scales, c("x","y"), several.ok=T)
 	if (!is.null(buttons) && !is.list(buttons)) {
-		stop("'buttons' should be a list (like 'plotAndPlayButtons') or NULL")
+		if (is.character(buttons)) buttons <- as.list(buttons) else
+		stop("'buttons' should be a list (of character or calls) or NULL")
 	}
 	if (!is.null(extra.buttons) && !is.list(extra.buttons)) {
-		stop("'extra.buttons' should be a list (like 'plotAndPlayButtons') or NULL")
+		if (is.character(extra.buttons)) extra.buttons <- as.list(extra.buttons) else
+		stop("'extra.buttons' should be a list (of character or calls) or NULL")
 	}
-	# put call into canonical form and evaluate its arguments
+	if (!is.null(basic.buttons) && !is.list(basic.buttons)) {
+		if (is.character(basic.buttons)) basic.buttons <- as.list(basic.buttons) else
+		stop("'basic.buttons' should be a list (of character or calls) or NULL")
+	}
+	# put call into canonical form and maybe evaluate its arguments
 	plot.call <- match.call(eval(plot.call[[1]]), plot.call)
 	if (!identical(eval.args, FALSE)) {
 		plot.call <- evalCallArgs(plot.call, envir=envir, pattern=eval.args)
 	}
 	callName <- deparse(plot.call[[1]])
+	if (is.lattice && !exists("panel.brush.splom")) {
+		stop("Need version >= 0.16 of the lattice package.")
+	}
 	if (is.lattice &&
 		!(callName %in% c("splom", "cloud", "levelplot",
 			"contourplot", "wireframe", "parallel")) ) {
@@ -142,8 +227,8 @@ plotAndPlay <- function(expr, name="plot", plot.call, nav.scales=c("x","y"), tra
 				identify.call$labels <- labels
 			}
 		}
-		identify.call$cex <- 0.7
 	}
+	identify.call <- as.call(c(as.list(identify.call), label.args))
 	# put identify call into canonical form
 	identify.call <- match.call(eval(identify.call[[1]]), identify.call)
 	# check whether the window already exists
@@ -179,8 +264,9 @@ plotAndPlay <- function(expr, name="plot", plot.call, nav.scales=c("x","y"), tra
 		StateEnv[[name]]$call <- NULL
 		plot.new()
 		# remove the toolbar, it will be recreated
-		plotAndPlayGetToolbar(name)$destroy()
+		plotAndPlayGetToolbar()$destroy()
 	}
+	
 	# set which buttons are visible
 	if (is.lattice &&
 		(callName %in% c("cloud", "wireframe")) ) {
@@ -189,8 +275,8 @@ plotAndPlay <- function(expr, name="plot", plot.call, nav.scales=c("x","y"), tra
 			plot.call$screen <- list(z = 40, x = -60)
 		}
 		if (missing(buttons)) {
-			buttons <- plotAndPlayButtons[c("zoomin.3d",
-				"zoomout.3d", "fly.left.3d", "fly.right.3d")]
+			buttons <- list("zoomin.3d", "zoomout.3d", 
+				"fly.left.3d", "fly.right.3d")
 		}
 		if (missing(extra.buttons)) {
 			extra.buttons <- list()
@@ -199,15 +285,13 @@ plotAndPlay <- function(expr, name="plot", plot.call, nav.scales=c("x","y"), tra
 	if (is.lattice &&
 		(callName %in% c("splom")) ) {
 		if (missing(buttons)) {
-			buttons <- plotAndPlayButtons[c("brush", 
-				"brush.region", "brush.drag", "clear")]
+			buttons <- list("brush", "brush.region", "brush.drag", "clear")
 		}
 		if (missing(extra.buttons)) {
 			extra.buttons <- list()
 		}
 	}
-	extra.unique <- !(names(extra.buttons) %in% names(buttons))
-	buttons <- c(buttons, extra.buttons[extra.unique])
+	buttons <- c(buttons, extra.buttons)
 	if (is.lattice) {
 		result <- eval(plot.call)
 		nPanels <- prod(dim(result))
@@ -217,114 +301,80 @@ plotAndPlay <- function(expr, name="plot", plot.call, nav.scales=c("x","y"), tra
 			nPerPage <- myLayout[1] * myLayout[2]
 			if (myLayout[1] == 0) { nPerPage <- myLayout[2] }
 			if (nPanels > nPerPage) {
-				buttons$prev.page <- plotAndPlayButtons$prev.page
-				buttons$next.page <- plotAndPlayButtons$next.page
+				buttons <- c(buttons, "prev.page", "next.page")
 			}
 			# needed for page navigation (packet.panel.page)
 			myLayout[3] <- 1
 			plot.call$layout <- myLayout
 		}
 		if (nPerPage > 1) {
-			buttons$expand <- plotAndPlayButtons$expand
+			buttons <- c(buttons, "expand")
 		}
 	}
+	if (!is.lattice) basic.buttons$greyscale <- NULL
+	buttons <- c(buttons, basic.buttons)
+	# create the toolbar
 	theToolbar <- gtkToolbar()
 	theToolbar[["toolbar-style"]] <- GtkToolbarStyle['both']
 	myVBox$packStart(theToolbar, expand=FALSE)
-	gtkToolButtonWithCallback <- function(label, icon.name=NULL, f, data=list(), isToggle=F) {
-		x <- if (isToggle) { gtkToggleToolButton() } else { gtkToolButton() }
-		x[["label"]] <- label
-		x[["icon-name"]] <- icon.name
-		gSignalConnect(x, "clicked", f, data=data)
-		x
-	}
-	for (buttonName in names(buttons)) {
-		xargs <- eval(buttons[[buttonName]])
-		if (is.null(xargs)) {
-			warning("Unrecognised button")
-			next
+	# add buttons
+	for (i in seq_along(buttons)) {
+		newButton <- eval(buttons[[i]])
+		if (is.character(newButton)) {
+			newButton <- eval(plotAndPlayButtons[[newButton]])
 		}
-		buttonCall <- do.call('call', c('gtkToolButtonWithCallback', xargs))
-		buttonCall <- match.call(gtkToolButtonWithCallback, buttonCall)
-		buttonCall$data$name <- name
-		if (is.lattice && buttonName == "identify") {
-			idButton <- gtkMenuToolButton(
-				gtkImageNewFromStock(buttonCall$icon.name, 
-					size=GtkIconSize['small-toolbar']),
-					label=buttonCall$label)
-			gSignalConnect(idButton, "clicked", buttonCall$f, data=buttonCall$data)
-			theToolbar$insert(idButton, -1)
-			idMenu <- gtkMenu()
-			idItemRegion <- gtkMenuItem("Label all points in a region")
-			idItemClear <- gtkMenuItem("Clear labels")
-			idMenu$append(idItemRegion)
-			idMenu$append(idItemClear)
-			idButton$setMenu(idMenu)
-			gSignalConnect(idItemRegion, "activate", 
-				.plotAndPlay_identify_region_event, data=buttonCall$data)
-			gSignalConnect(idItemClear, "activate", 
-				.plotAndPlay_clear_event, data=buttonCall$data)
-		} else {
-			newButton <- eval(buttonCall)
-			theToolbar$insert(newButton, -1)
+		if (is.null(newButton)) {
+			stop("Unrecognised (NULL) button at position ", i)
 		}
+		theToolbar$insert(newButton, -1)
 	}
-	# insert standard toolbar items: save etc
-	theToolbar$insert(gtkSeparatorToolItem(), -1)
-	saveButton <- gtkMenuToolButton(gtkImageNewFromStock('gtk-save-as', 
-		size=GtkIconSize['small-toolbar']), label="Save as")
-	gSignalConnect(saveButton, "clicked", .plotAndPlay_save_event, data=list(name=name))
-	theToolbar$insert(saveButton, -1)
-	saveMenu <- gtkMenu()
-	saveItemPDF <- gtkMenuItem("PDF")
-	saveItemPNG <- gtkMenuItem("PNG (bitmap)")
-	saveItemPS <- gtkMenuItem("PostScript")
-	saveItemSVG <- gtkMenuItem("SVG")
-	saveMenu$append(saveItemPDF)
-	saveMenu$append(saveItemPNG)
-	saveMenu$append(saveItemPS)
-	saveMenu$append(saveItemSVG)
-	saveButton$setMenu(saveMenu)
-	gSignalConnect(saveItemPDF, "activate", .plotAndPlay_save_event, 
-		data=list(name=name, ext="pdf"))
-	gSignalConnect(saveItemPNG, "activate", .plotAndPlay_save_event, 
-		data=list(name=name, ext="png"))
-	gSignalConnect(saveItemPS, "activate", .plotAndPlay_save_event, 
-		data=list(name=name, ext="ps"))
-	gSignalConnect(saveItemSVG, "activate", .plotAndPlay_save_event, 
-		data=list(name=name, ext="svg"))
-	# copy button
-	copyButton <- gtkToolButtonWithCallback("Copy", "gtk-copy", 
-		f=.plotAndPlay_copy_event, data=list(name=name))
-	theToolbar$insert(copyButton, -1)
-	if (is.lattice) {
-		greyButton <- gtkToolButtonWithCallback("Greyscale", "gtk-print-preview", 
-			f=.plotAndPlay_greyscale_event, data=list(name=name), isToggle=T)
-		theToolbar$insert(greyButton, -1)
-	}
+	# set StateEnv$.current to 'name' whenever this window comes to front
+	gSignalConnect(myWin, "focus-in-event", 
+		.plotAndPlay_window_focus_in_event, data=list(name=name))
+	gSignalConnect(myWin, "focus-out-event", 
+		.plotAndPlay_window_focus_out_event, data=list(name=name))
+	StateEnv$.current <- name
 	# bring window to front
 	myWin$present()
 	# store the state of this plot window
 	StateEnv[[name]] <- list(
 		win=myWin,
 		dev=dev.cur(),
+		old.dev=dev.cur(),
 		call=plot.call,
 		id.call=identify.call,
-		ids=list(),
-		brushed=list(),
-		focus=list(col=0, row=0),
+		label.args=label.args,
 		nav.scales=nav.scales,
 		trans.scales=trans.scales,
+		ids=list(),
+		brushed=list(),
 		is.lattice=is.lattice,
+		focus=list(col=0, row=0),
 		page=1,
 		restore.on.close=restore.on.close
 	)
 	# do the plot
-	invisible(plotAndPlayUpdate(name))
+	invisible(plotAndPlayUpdate())
+}
+
+.plotAndPlay_window_focus_in_event <- function(widget, event, user.data) {
+	name <- user.data$name
+	StateEnv$.current <- name
+	# switch to this device
+	StateEnv[[name]]$old.dev <- dev.cur()
+	dev.set(StateEnv[[name]]$dev)
+	return(FALSE)
+}
+
+.plotAndPlay_window_focus_out_event <- function(widget, event, user.data) {
+	name <- user.data$name
+	# revert to previous device
+	dev.set(StateEnv[[name]]$old.dev)
+	return(FALSE)
 }
 
 .plotAndPlay_close_event <- function(widget, event, user.data) {
-	name <- user.data$name
+	name <- StateEnv$.current
 	if (is.null(StateEnv[[name]])) { return() }
 	if (StateEnv[[name]]$dev %in% dev.list()) {
 		try(dev.off(StateEnv[[name]]$dev))
@@ -339,14 +389,10 @@ plotAndPlay <- function(expr, name="plot", plot.call, nav.scales=c("x","y"), tra
 }
 
 .plotAndPlay_save_event <- function(widget, user.data) {
-	name <- user.data$name
+	name <- StateEnv$.current
 	# disable other plot buttons until this is over
-	plotAndPlayGetToolbar(name)$setSensitive(F)
-	on.exit(plotAndPlayGetToolbar(name)$setSensitive(T))
-	# switch to this device
-	oldDev <- dev.cur()
-	dev.set(StateEnv[[name]]$dev)
-	on.exit(dev.set(oldDev), add=T)
+	plotAndPlayGetToolbar()$setSensitive(F)
+	on.exit(plotAndPlayGetToolbar()$setSensitive(T))
 	# get filename
 	myExt <- if (!is.null(user.data$ext)) { user.data$ext } else { 'pdf' }
 	myDefault <- paste(name, '.', myExt, sep='')
@@ -362,7 +408,7 @@ plotAndPlay <- function(expr, name="plot", plot.call, nav.scales=c("x","y"), tra
 		ext <- 'pdf'
 	}
 	# save plot to file
-	mySize <- plotAndPlayGetDA(name)$getAllocation()
+	mySize <- plotAndPlayGetDA()$getAllocation()
 	myWidth <- mySize$width
 	myHeight <- mySize$height
 	myScale <- 1/72
@@ -391,17 +437,13 @@ plotAndPlay <- function(expr, name="plot", plot.call, nav.scales=c("x","y"), tra
 }
 
 .plotAndPlay_copy_event <- function(widget, user.data) {
-	name <- user.data$name
+	name <- StateEnv$.current
 	# disable other plot buttons until this is over
-	plotAndPlayGetToolbar(name)$setSensitive(F)
-	on.exit(plotAndPlayGetToolbar(name)$setSensitive(T))
-	# switch to this device
-	oldDev <- dev.cur()
-	dev.set(StateEnv[[name]]$dev)
-	on.exit(dev.set(oldDev), add=T)
+	plotAndPlayGetToolbar()$setSensitive(F)
+	on.exit(plotAndPlayGetToolbar()$setSensitive(T))
 	# save plot to file
 	filename <- paste(tempfile(), ".png", sep="")
-	mySize <- plotAndPlayGetDA(name)$getAllocation()
+	mySize <- plotAndPlayGetDA()$getAllocation()
 	myWidth <- mySize$width
 	myHeight <- mySize$height
 	myScale <- 1/72
@@ -415,14 +457,10 @@ plotAndPlay <- function(expr, name="plot", plot.call, nav.scales=c("x","y"), tra
 }
 
 .plotAndPlay_greyscale_event <- function(widget, user.data) {
-	name <- user.data$name
+	name <- StateEnv$.current
 	# disable other plot buttons until this is over
-	plotAndPlayGetToolbar(name)$setSensitive(F)
-	on.exit(plotAndPlayGetToolbar(name)$setSensitive(T))
-	# switch to this device
-	oldDev <- dev.cur()
-	dev.set(StateEnv[[name]]$dev)
-	on.exit(dev.set(oldDev), add=T)
+	plotAndPlayGetToolbar()$setSensitive(F)
+	on.exit(plotAndPlayGetToolbar()$setSensitive(T))
 	# get new greyscale setting
 	greyscale <- widget$getActive()
 	# make change and re-draw plot
@@ -431,23 +469,19 @@ plotAndPlay <- function(expr, name="plot", plot.call, nav.scales=c("x","y"), tra
 	} else {
 		trellis.device(new=F)
 	}
-	plotAndPlayUpdate(name)
+	plotAndPlayUpdate()
 }
 
 .plotAndPlay_zoomin_event <- function(widget, user.data) {
-	name <- user.data$name
+	name <- StateEnv$.current
 	nav.x <- ("x" %in% StateEnv[[name]]$nav.scales)
 	nav.y <- ("y" %in% StateEnv[[name]]$nav.scales)
 	# disable other plot buttons until this is over
-	plotAndPlayGetToolbar(name)$setSensitive(F)
-	on.exit(plotAndPlayGetToolbar(name)$setSensitive(T))
-	# switch to this device
-	oldDev <- dev.cur()
-	dev.set(StateEnv[[name]]$dev)
-	on.exit(dev.set(oldDev), add=T)
+	plotAndPlayGetToolbar()$setSensitive(F)
+	on.exit(plotAndPlayGetToolbar()$setSensitive(T))
 	# set up prompt
-	plotAndPlayMakePrompt(name)
-	on.exit(plotAndPlayUnmakePrompt(name), add=T)
+	plotAndPlayMakePrompt()
+	on.exit(plotAndPlayUnmakePrompt(), add=T)
 	lowEdge <- "bottom-left corner"
 	if (!nav.y) { lowEdge <- "left edge" }
 	if (!nav.x) { lowEdge <- "bottom edge" }
@@ -460,9 +494,9 @@ plotAndPlay <- function(expr, name="plot", plot.call, nav.scales=c("x","y"), tra
 	# get new scales interactively
 	if (StateEnv[[name]]$is.lattice) {
 		# lattice plot
-		newFocus <- plotAndPlayDoFocus(name)
+		newFocus <- plotAndPlayDoFocus()
 		if (!any(newFocus)) { return() }
-		plotAndPlaySetPrompt(name, paste("Zooming to selected region...",
+		plotAndPlaySetPrompt(paste("Zooming to selected region...",
 			"click at the", lowEdge))
 		xlim <- convertX(unit(0:1, "npc"), "native", valueOnly=T)
 		ylim <- convertY(unit(0:1, "npc"), "native", valueOnly=T)
@@ -484,10 +518,10 @@ plotAndPlay <- function(expr, name="plot", plot.call, nav.scales=c("x","y"), tra
 			x=unit(1,"npc"), width=unit(xlim[2] - xlim.new[1],"native"),
 			just=c("right", "bottom")))
 		# get upper limits
-		plotAndPlaySetPrompt(name, paste("OK, now click at the", highEdge))
+		plotAndPlaySetPrompt(paste("OK, now click at the", highEdge))
 		clickLoc <- grid.locator()
 		if (is.null(clickLoc)) {
-			plotAndPlayUpdate(name)
+			plotAndPlayUpdate()
 			return()
 		}
 		clickLoc <- lapply(clickLoc, as.numeric)
@@ -528,7 +562,7 @@ plotAndPlay <- function(expr, name="plot", plot.call, nav.scales=c("x","y"), tra
 		if (nav.y) { StateEnv[[name]]$call$ylim <- newlims$y }
 	} else {
 		# traditional graphics plot
-		plotAndPlaySetPrompt(name, paste("Zooming to selected region...",
+		plotAndPlaySetPrompt(paste("Zooming to selected region...",
 			"click at the", lowEdge))
 		xlim <- par("usr")[1:2]
 		ylim <- par("usr")[3:4]
@@ -542,7 +576,7 @@ plotAndPlay <- function(expr, name="plot", plot.call, nav.scales=c("x","y"), tra
 		if (nav.x) { abline(v=xlim.new, col="red") }
 		if (nav.y) { abline(h=ylim.new, col="red") }
 		# get upper limits
-		plotAndPlaySetPrompt(name, paste("OK, now click at the", highEdge))
+		plotAndPlaySetPrompt(paste("OK, now click at the", highEdge))
 		clickLoc <- locator(n=1)
 		if (is.null(clickLoc)) {
 			return()
@@ -551,24 +585,22 @@ plotAndPlay <- function(expr, name="plot", plot.call, nav.scales=c("x","y"), tra
 		ylim.new[2] <- if (nav.y) { clickLoc$y } else { ylim[2] }
 		if (nav.x) { abline(v=xlim.new[2], col="red") }
 		if (nav.y) { abline(h=ylim.new[2], col="red") }
-		# convert back from log scale if required (TODO)
+		# convert back from log scale if required
+		if (par("xlog")) xlim <- 10 ^ xlim
+		if (par("ylog")) ylim <- 10 ^ ylim
 		if (nav.x) { StateEnv[[name]]$call$xlim <- xlim.new }
 		if (nav.y) { StateEnv[[name]]$call$ylim <- ylim.new }
 	}
-	plotAndPlayUpdate(name)
+	plotAndPlayUpdate()
 }
 
 .plotAndPlay_zoomout_event <- function(widget, user.data) {
-	name <- user.data$name
+	name <- StateEnv$.current
 	nav.x <- ("x" %in% StateEnv[[name]]$nav.scales)
 	nav.y <- ("y" %in% StateEnv[[name]]$nav.scales)
 	# disable other plot buttons until this is over
-	plotAndPlayGetToolbar(name)$setSensitive(F)
-	on.exit(plotAndPlayGetToolbar(name)$setSensitive(T))
-	# switch to this device
-	oldDev <- dev.cur()
-	dev.set(StateEnv[[name]]$dev)
-	on.exit(dev.set(oldDev), add=T)
+	plotAndPlayGetToolbar()$setSensitive(F)
+	on.exit(plotAndPlayGetToolbar()$setSensitive(T))
 	# find existing scales and update call
 	if (StateEnv[[name]]$is.lattice) {
 		# lattice plot
@@ -591,20 +623,22 @@ plotAndPlay <- function(expr, name="plot", plot.call, nav.scales=c("x","y"), tra
 		# zoom out: make range twice the size
 		if (nav.x) { xlim <- xlim + diff(xlim) * c(-0.5, 0.5) }
 		if (nav.y) { ylim <- ylim + diff(ylim) * c(-0.5, 0.5) }
-		# convert back from log scale if required (TODO)
+		# convert back from log scale if required
+		if (par("xlog")) xlim <- 10 ^ xlim
+		if (par("ylog")) ylim <- 10 ^ ylim
 		if (nav.x) { StateEnv[[name]]$call$xlim <- xlim }
 		if (nav.y) { StateEnv[[name]]$call$ylim <- ylim }
 	}
-	plotAndPlayUpdate(name)
+	plotAndPlayUpdate()
 }
 
 .plotAndPlay_zoomfit_event <- function(widget, user.data) {
-	name <- user.data$name
+	name <- StateEnv$.current
 	nav.x <- ("x" %in% StateEnv[[name]]$nav.scales)
 	nav.y <- ("y" %in% StateEnv[[name]]$nav.scales)
 	# disable other plot buttons until this is over
-	plotAndPlayGetToolbar(name)$setSensitive(F)
-	on.exit(plotAndPlayGetToolbar(name)$setSensitive(T))
+	plotAndPlayGetToolbar()$setSensitive(F)
+	on.exit(plotAndPlayGetToolbar()$setSensitive(T))
 	# find existing scales and update call
 	if (StateEnv[[name]]$is.lattice) {
 		# lattice plot
@@ -615,29 +649,25 @@ plotAndPlay <- function(expr, name="plot", plot.call, nav.scales=c("x","y"), tra
 		if (nav.x) { StateEnv[[name]]$call$xlim <- NULL }
 		if (nav.y) { StateEnv[[name]]$call$ylim <- NULL }
 	}
-	plotAndPlayUpdate(name)
+	plotAndPlayUpdate()
 }
 
 .plotAndPlay_centre_event <- function(widget, user.data) {
-	name <- user.data$name
+	name <- StateEnv$.current
 	nav.x <- ("x" %in% StateEnv[[name]]$nav.scales)
 	nav.y <- ("y" %in% StateEnv[[name]]$nav.scales)
 	# disable other plot buttons until this is over
-	plotAndPlayGetToolbar(name)$setSensitive(F)
-	on.exit(plotAndPlayGetToolbar(name)$setSensitive(T))
-	# switch to this device
-	oldDev <- dev.cur()
-	dev.set(StateEnv[[name]]$dev)
-	on.exit(dev.set(oldDev), add=T)
+	plotAndPlayGetToolbar()$setSensitive(F)
+	on.exit(plotAndPlayGetToolbar()$setSensitive(T))
 	# set up prompt
-	plotAndPlayMakePrompt(name)
-	on.exit(plotAndPlayUnmakePrompt(name), add=T)
+	plotAndPlayMakePrompt()
+	on.exit(plotAndPlayUnmakePrompt(), add=T)
 	# get new scales interactively
 	if (StateEnv[[name]]$is.lattice) {
 		# lattice plot
-		newFocus <- plotAndPlayDoFocus(name)
+		newFocus <- plotAndPlayDoFocus()
 		if (!any(newFocus)) { return() }
-		plotAndPlaySetPrompt(name, "Click to re-centre the plot")
+		plotAndPlaySetPrompt("Click to re-centre the plot")
 		xlim <- convertX(unit(0:1, "npc"), "native", valueOnly=T)
 		ylim <- convertY(unit(0:1, "npc"), "native", valueOnly=T)
 		# get new centre point
@@ -668,7 +698,7 @@ plotAndPlay <- function(expr, name="plot", plot.call, nav.scales=c("x","y"), tra
 		if (nav.y) { StateEnv[[name]]$call$ylim <- newlims$y }
 	} else {
 		# traditional graphics plot
-		plotAndPlaySetPrompt(name, "Click to re-centre the plot")
+		plotAndPlaySetPrompt("Click to re-centre the plot")
 		xlim <- par("usr")[1:2]
 		ylim <- par("usr")[3:4]
 		# get new centre point
@@ -678,26 +708,24 @@ plotAndPlay <- function(expr, name="plot", plot.call, nav.scales=c("x","y"), tra
 		}
 		if (nav.x) { xlim <- clickLoc$x + diff(xlim) * c(-0.5, 0.5) }
 		if (nav.y) { ylim <- clickLoc$y + diff(ylim) * c(-0.5, 0.5) }
-		# convert back from log scale if required (TODO)
+		# convert back from log scale if required
+		if (par("xlog")) xlim <- 10 ^ xlim
+		if (par("ylog")) ylim <- 10 ^ ylim
 		if (nav.x) { StateEnv[[name]]$call$xlim <- xlim }
 		if (nav.y) { StateEnv[[name]]$call$ylim <- ylim }
 	}
-	plotAndPlayUpdate(name)
+	plotAndPlayUpdate()
 }
 
 .plotAndPlay_focus_event <- function(widget, user.data) {
-	name <- user.data$name
+	name <- StateEnv$.current
 	# disable other plot buttons until this is over
-	plotAndPlayGetToolbar(name)$setSensitive(F)
-	on.exit(plotAndPlayGetToolbar(name)$setSensitive(T))
-	# switch to this device
-	oldDev <- dev.cur()
-	dev.set(StateEnv[[name]]$dev)
-	on.exit(dev.set(oldDev), add=T)
+	plotAndPlayGetToolbar()$setSensitive(F)
+	on.exit(plotAndPlayGetToolbar()$setSensitive(T))
 	# set up prompt
-	plotAndPlayMakePrompt(name)
-	on.exit(plotAndPlayUnmakePrompt(name), add=T)
-	plotAndPlaySetPrompt(name, "Click on a panel to focus on (for further interaction)")
+	plotAndPlayMakePrompt()
+	on.exit(plotAndPlayUnmakePrompt(), add=T)
+	plotAndPlaySetPrompt("Click on a panel to focus on (for further interaction)")
 	newFocus <- trellis.focus()
 	if (!is.null(newFocus)) {
 		StateEnv[[name]]$focus <- newFocus
@@ -705,21 +733,17 @@ plotAndPlay <- function(expr, name="plot", plot.call, nav.scales=c("x","y"), tra
 }
 
 .plotAndPlay_expand_event <- function(widget, user.data) {
-	name <- user.data$name
+	name <- StateEnv$.current
 	# disable other plot buttons until this is over
-	plotAndPlayGetToolbar(name)$setSensitive(F)
-	on.exit(plotAndPlayGetToolbar(name)$setSensitive(T))
-	# switch to this device
-	oldDev <- dev.cur()
-	dev.set(StateEnv[[name]]$dev)
-	on.exit(dev.set(oldDev), add=T)
+	plotAndPlayGetToolbar()$setSensitive(F)
+	on.exit(plotAndPlayGetToolbar()$setSensitive(T))
 	# get new expanded setting
 	doExpand <- widget$getActive()
 	if (doExpand) {
 		# set up prompt
-		plotAndPlayMakePrompt(name)
-		on.exit(plotAndPlayUnmakePrompt(name), add=T)
-		plotAndPlaySetPrompt(name, "Click on a panel to expand (for further interaction)")
+		plotAndPlayMakePrompt()
+		on.exit(plotAndPlayUnmakePrompt(), add=T)
+		plotAndPlaySetPrompt("Click on a panel to expand (for further interaction)")
 		newFocus <- trellis.focus()
 		if (!any(newFocus)) { return() }
 		StateEnv[[name]]$focus <- list(col=0, row=0)
@@ -732,35 +756,33 @@ plotAndPlay <- function(expr, name="plot", plot.call, nav.scales=c("x","y"), tra
 		StateEnv[[name]]$call$layout <- StateEnv[[name]]$old.call.layout
 		StateEnv[[name]]$page <- StateEnv[[name]]$old.page
 	}
-	plotAndPlayUpdate(name)
+	plotAndPlayUpdate()
 }
 
 .plotAndPlay_identify_event <- function(widget, user.data) {
-	name <- user.data$name
+	name <- StateEnv$.current
 	# disable other plot buttons until this is over
-	plotAndPlayGetToolbar(name)$setSensitive(F)
-	on.exit(plotAndPlayGetToolbar(name)$setSensitive(T))
-	# switch to this device
-	oldDev <- dev.cur()
-	dev.set(StateEnv[[name]]$dev)
-	on.exit(dev.set(oldDev), add=T)
+	plotAndPlayGetToolbar()$setSensitive(F)
+	on.exit(plotAndPlayGetToolbar()$setSensitive(T))
 	# set up prompt
-	plotAndPlayMakePrompt(name)
-	on.exit(plotAndPlayUnmakePrompt(name), add=T)
+	plotAndPlayMakePrompt()
+	on.exit(plotAndPlayUnmakePrompt(), add=T)
 	# do identify
 	idCall <- StateEnv[[name]]$id.call
 	if (!StateEnv[[name]]$is.lattice) {
 		# traditional graphics plot
-		plotAndPlaySetPrompt(name, paste("Identifying data points...",
+		plotAndPlaySetPrompt(paste("Identifying data points...",
 			"Click the right mouse button to finish."))
 		ids.new <- eval(idCall)
-		# TODO: store these and redisplay on plotAndPlayUpdate()
+		# set identified points
+		ids.old <- StateEnv[[name]]$ids$all # may be NULL
+		StateEnv[[name]]$ids$all <- union(ids.old, ids.new)
 		return()
 	}
 	# lattice plot
-	newFocus <- plotAndPlayDoFocus(name, clip.off=T)
+	newFocus <- plotAndPlayDoFocus(clip.off=T)
 	if (!any(newFocus)) { return() }
-	plotAndPlaySetPrompt(name, paste("Identifying data points...",
+	plotAndPlaySetPrompt(paste("Identifying data points...",
 		"Click the right mouse button to finish."))
 	ids.new <- eval(idCall)
 	# set identified points
@@ -771,23 +793,19 @@ plotAndPlay <- function(expr, name="plot", plot.call, nav.scales=c("x","y"), tra
 }
 
 .plotAndPlay_identify_region_event <- function(widget, user.data) {
-	name <- user.data$name
+	name <- StateEnv$.current
 	nav.x <- ("x" %in% StateEnv[[name]]$nav.scales)
 	nav.y <- ("y" %in% StateEnv[[name]]$nav.scales)
 	if (!StateEnv[[name]]$is.lattice) {
-		errorDialog("This only works for Lattice plots.")
+		errorDialog("This currently only works for Lattice plots.")
 		return()
 	}
 	# disable other plot buttons until this is over
-	plotAndPlayGetToolbar(name)$setSensitive(F)
-	on.exit(plotAndPlayGetToolbar(name)$setSensitive(T))
-	# switch to this device
-	oldDev <- dev.cur()
-	dev.set(StateEnv[[name]]$dev)
-	on.exit(dev.set(oldDev), add=T)
+	plotAndPlayGetToolbar()$setSensitive(F)
+	on.exit(plotAndPlayGetToolbar()$setSensitive(T))
 	# set up prompt
-	plotAndPlayMakePrompt(name)
-	on.exit(plotAndPlayUnmakePrompt(name), add=T)
+	plotAndPlayMakePrompt()
+	on.exit(plotAndPlayUnmakePrompt(), add=T)
 	lowEdge <- "bottom-left corner"
 	if (!nav.y) { lowEdge <- "left edge" }
 	if (!nav.x) { lowEdge <- "bottom edge" }
@@ -795,9 +813,9 @@ plotAndPlay <- function(expr, name="plot", plot.call, nav.scales=c("x","y"), tra
 	if (!nav.y) { highEdge <- "right edge" }
 	if (!nav.x) { highEdge <- "top edge" }
 	# get region
-	newFocus <- plotAndPlayDoFocus(name, clip.off=T)
+	newFocus <- plotAndPlayDoFocus(clip.off=T)
 	if (!any(newFocus)) { return() }
-	plotAndPlaySetPrompt(name, paste("Identifying data points in a region...",
+	plotAndPlaySetPrompt(paste("Identifying data points in a region...",
 		"click at the", lowEdge))
 	xlim <- convertX(unit(0:1, "npc"), "native", valueOnly=T)
 	ylim <- convertY(unit(0:1, "npc"), "native", valueOnly=T)
@@ -818,10 +836,10 @@ plotAndPlay <- function(expr, name="plot", plot.call, nav.scales=c("x","y"), tra
 	#if (nav.y) { grid.lines(y=unit(ylim.new, "native"), 
 	#	gp=gpar(col="red", lwd=2), name="tmp.mask") }
 	# get upper limits
-	plotAndPlaySetPrompt(name, paste("OK, now click at the", highEdge))
+	plotAndPlaySetPrompt(paste("OK, now click at the", highEdge))
 	clickLoc <- grid.locator()
 	if (is.null(clickLoc)) {
-		plotAndPlayUpdate(name)
+		plotAndPlayUpdate()
 		return()
 	}
 	clickLoc <- lapply(clickLoc, as.numeric)
@@ -833,7 +851,7 @@ plotAndPlay <- function(expr, name="plot", plot.call, nav.scales=c("x","y"), tra
 	# set identified points
 	idCall <- StateEnv[[name]]$id.call
 	if ('x' %in% names(idCall)) {
-		xy <- xy.coords(idCall$x, idCall$y, recycle=T)
+		xy <- xy.coords(eval(idCall$x), eval(idCall$y), recycle=T)
 		subscripts <- seq_along(xy$x)
 	} else {
 		pargs <- trellis.panelArgs()
@@ -848,29 +866,25 @@ plotAndPlay <- function(expr, name="plot", plot.call, nav.scales=c("x","y"), tra
 	myPacket <- as.character(packet.number())
 	ids.old <- StateEnv[[name]]$ids[[myPacket]] # may be NULL
 	StateEnv[[name]]$ids[[myPacket]] <- union(ids.old, ids.new)
-	plotAndPlayUpdate(name)
+	plotAndPlayUpdate()
 }
 
 .plotAndPlay_brush_event <- function(widget, user.data) {
-	name <- user.data$name
+	name <- StateEnv$.current
 	if (!StateEnv[[name]]$is.lattice) {
 		errorDialog("Brushing only works for Lattice plots (splom).")
 		return()
 	}
 	# disable other plot buttons until this is over
-	plotAndPlayGetToolbar(name)$setSensitive(F)
-	on.exit(plotAndPlayGetToolbar(name)$setSensitive(T))
-	# switch to this device
-	oldDev <- dev.cur()
-	dev.set(StateEnv[[name]]$dev)
-	on.exit(dev.set(oldDev), add=T)
+	plotAndPlayGetToolbar()$setSensitive(F)
+	on.exit(plotAndPlayGetToolbar()$setSensitive(T))
 	# set up prompt
-	plotAndPlayMakePrompt(name)
-	on.exit(plotAndPlayUnmakePrompt(name), add=T)
+	plotAndPlayMakePrompt()
+	on.exit(plotAndPlayUnmakePrompt(), add=T)
 	# do brushing
-	newFocus <- plotAndPlayDoFocus(name)
+	newFocus <- plotAndPlayDoFocus()
 	if (!any(newFocus)) { return() }
-	plotAndPlaySetPrompt(name, paste("Brushing data points...",
+	plotAndPlaySetPrompt(paste("Brushing data points...",
 		"Click the right mouse button to finish."))
 	brushed.new <- panel.brush.splom()
 	myPacket <- as.character(packet.number())
@@ -881,25 +895,21 @@ plotAndPlay <- function(expr, name="plot", plot.call, nav.scales=c("x","y"), tra
 }
 
 .plotAndPlay_brush_drag_event <- function(widget, user.data) {
-	name <- user.data$name
+	name <- StateEnv$.current
 	if (!StateEnv[[name]]$is.lattice) {
 		errorDialog("Brushing only works for Lattice plots (splom).")
 		return()
 	}
 	# disable other plot buttons until this is over
-	plotAndPlayGetToolbar(name)$setSensitive(F)
-	on.exit(plotAndPlayGetToolbar(name)$setSensitive(T))
-	# switch to this device
-	oldDev <- dev.cur()
-	dev.set(StateEnv[[name]]$dev)
-	on.exit(dev.set(oldDev), add=T)
+	plotAndPlayGetToolbar()$setSensitive(F)
+	on.exit(plotAndPlayGetToolbar()$setSensitive(T))
 	# set up prompt
-	plotAndPlayMakePrompt(name)
-	on.exit(plotAndPlayUnmakePrompt(name), add=T)
+	plotAndPlayMakePrompt()
+	on.exit(plotAndPlayUnmakePrompt(), add=T)
 	# do brushing
-	newFocus <- plotAndPlayDoFocus(name)
+	newFocus <- plotAndPlayDoFocus()
 	if (!any(newFocus)) { return() }
-	plotAndPlaySetPrompt(name, paste("Brushing data points in a region...",
+	plotAndPlaySetPrompt(paste("Brushing data points in a region...",
 		"click and drag!"))
 	pargs <- trellis.panelArgs()
 	nvars <- length(pargs$z)
@@ -960,7 +970,7 @@ plotAndPlay <- function(expr, name="plot", plot.call, nav.scales=c("x","y"), tra
 }
 
 .plotAndPlay_brush_region_event <- function(widget, user.data) {
-	name <- user.data$name
+	name <- StateEnv$.current
 	nav.x <- ("x" %in% StateEnv[[name]]$nav.scales)
 	nav.y <- ("y" %in% StateEnv[[name]]$nav.scales)
 	if (!StateEnv[[name]]$is.lattice) {
@@ -968,15 +978,11 @@ plotAndPlay <- function(expr, name="plot", plot.call, nav.scales=c("x","y"), tra
 		return()
 	}
 	# disable other plot buttons until this is over
-	plotAndPlayGetToolbar(name)$setSensitive(F)
-	on.exit(plotAndPlayGetToolbar(name)$setSensitive(T))
-	# switch to this device
-	oldDev <- dev.cur()
-	dev.set(StateEnv[[name]]$dev)
-	on.exit(dev.set(oldDev), add=T)
+	plotAndPlayGetToolbar()$setSensitive(F)
+	on.exit(plotAndPlayGetToolbar()$setSensitive(T))
 	# set up prompt
-	plotAndPlayMakePrompt(name)
-	on.exit(plotAndPlayUnmakePrompt(name), add=T)
+	plotAndPlayMakePrompt()
+	on.exit(plotAndPlayUnmakePrompt(), add=T)
 	lowEdge <- "bottom-left corner"
 	if (!nav.y) { lowEdge <- "left edge" }
 	if (!nav.x) { lowEdge <- "bottom edge" }
@@ -987,9 +993,9 @@ plotAndPlay <- function(expr, name="plot", plot.call, nav.scales=c("x","y"), tra
 	maskGrob <- rectGrob(gp=gpar(col="grey", 
 		fill=rgb(0.5,0.5,0.5, alpha=0.5)), name="tmp.mask")
 	# do brushing
-	newFocus <- plotAndPlayDoFocus(name)
+	newFocus <- plotAndPlayDoFocus()
 	if (!any(newFocus)) { return() }
-	plotAndPlaySetPrompt(name, paste("Brushing data points in a region...",
+	plotAndPlaySetPrompt(paste("Brushing data points in a region...",
 		"click at the", lowEdge))
 	ll <- grid.locator(unit = "npc")
 	if (is.null(ll)) {
@@ -1017,10 +1023,10 @@ plotAndPlay <- function(expr, name="plot", plot.call, nav.scales=c("x","y"), tra
 	if (nav.x) { panel.abline(v=xlim.new) }
 	if (nav.y) { panel.abline(h=ylim.new) }
 	# get upper bounds
-	plotAndPlaySetPrompt(name, paste("OK, now click at the", highEdge))
+	plotAndPlaySetPrompt(paste("OK, now click at the", highEdge))
 	ll <- grid.locator(unit = "npc")
 	if (is.null(ll)) {
-		plotAndPlayUpdate(name)
+		plotAndPlayUpdate()
 		return()
 	}
 	ll$x <- nvars * (ll$x - unit((colpos-1) / nvars, "npc"))
@@ -1045,30 +1051,23 @@ plotAndPlay <- function(expr, name="plot", plot.call, nav.scales=c("x","y"), tra
 	StateEnv[[name]]$brushed[[myPacket]] <- brushed.new
 	#splom.drawBrushed(brushed.new)
 	#if (!any(StateEnv[[name]]$focus)) { trellis.unfocus() }
-	plotAndPlayUpdate(name)
+	plotAndPlayUpdate()
 }
 
 .plotAndPlay_clear_event <- function(widget, user.data) {
-	name <- user.data$name
+	name <- StateEnv$.current
 	StateEnv[[name]]$ids <- list()
 	StateEnv[[name]]$brushed <- list()
-	plotAndPlayUpdate(name)
+	plotAndPlayUpdate()
 }
 
 .plotAndPlay_zero_event <- function(widget, user.data) {
-	name <- user.data$name
+	name <- StateEnv$.current
 	trans.x <- ("x" %in% StateEnv[[name]]$trans.scales)
 	trans.y <- ("y" %in% StateEnv[[name]]$trans.scales)
-	isX <- isTRUE(user.data$x)
-	isY <- isTRUE(user.data$y)
-	if (!isX && !isY) { isX <- isY <- T }
 	# disable other plot buttons until this is over
-	plotAndPlayGetToolbar(name)$setSensitive(F)
-	on.exit(plotAndPlayGetToolbar(name)$setSensitive(T))
-	# switch to this device
-	oldDev <- dev.cur()
-	dev.set(StateEnv[[name]]$dev)
-	on.exit(dev.set(oldDev), add=T)
+	plotAndPlayGetToolbar()$setSensitive(F)
+	on.exit(plotAndPlayGetToolbar()$setSensitive(T))
 	# get new zero scale setting
 	zeroScale <- widget$getActive()
 	# make change and re-draw plot
@@ -1105,16 +1104,16 @@ plotAndPlay <- function(expr, name="plot", plot.call, nav.scales=c("x","y"), tra
 		if (trans.x) { StateEnv[[name]]$call$xlim <- NULL }
 		if (trans.y) { StateEnv[[name]]$call$ylim <- NULL }
 	}
-	plotAndPlayUpdate(name)
+	plotAndPlayUpdate()
 }
 
 .plotAndPlay_logscale_event <- function(widget, user.data) {
-	name <- user.data$name
+	name <- StateEnv$.current
 	trans.x <- ("x" %in% StateEnv[[name]]$trans.scales)
 	trans.y <- ("y" %in% StateEnv[[name]]$trans.scales)
 	# disable other plot buttons until this is over
-	plotAndPlayGetToolbar(name)$setSensitive(F)
-	on.exit(plotAndPlayGetToolbar(name)$setSensitive(T))
+	plotAndPlayGetToolbar()$setSensitive(F)
+	on.exit(plotAndPlayGetToolbar()$setSensitive(T))
 	# get new log scale setting
 	logScale <- widget$getActive()
 	# make change and re-draw plot
@@ -1132,62 +1131,75 @@ plotAndPlay <- function(expr, name="plot", plot.call, nav.scales=c("x","y"), tra
 		if (!trans.x) { logSpec <- "y" }
 		StateEnv[[name]]$call$log <- if (logScale) { logSpec }
 	}
-	plotAndPlayUpdate(name)
+	plotAndPlayUpdate()
 }
 
 .plotAndPlay_zoomin3d_event <- function(widget, user.data) {
-	name <- user.data$name
+	name <- StateEnv$.current
 	StateEnv[[name]]$call$zoom <- StateEnv[[name]]$call$zoom * 1.5
-	plotAndPlayUpdate(name)
+	plotAndPlayUpdate()
 }
 
 .plotAndPlay_zoomout3d_event <- function(widget, user.data) {
-	name <- user.data$name
+	name <- StateEnv$.current
 	StateEnv[[name]]$call$zoom <- StateEnv[[name]]$call$zoom / 1.5
-	plotAndPlayUpdate(name)
+	plotAndPlayUpdate()
 }
 
 .plotAndPlay_flyleft3d_event <- function(widget, user.data) {
-	name <- user.data$name
+	name <- StateEnv$.current
 	StateEnv[[name]]$call$screen <- c(z=45, StateEnv[[name]]$call$screen)
-	plotAndPlayUpdate(name)
+	plotAndPlayUpdate()
 }
 
 .plotAndPlay_flyright3d_event <- function(widget, user.data) {
-	name <- user.data$name
+	name <- StateEnv$.current
 	StateEnv[[name]]$call$screen <- c(z=-45, StateEnv[[name]]$call$screen)
-	plotAndPlayUpdate(name)
+	plotAndPlayUpdate()
 }
 
 .plotAndPlay_prevpage_event <- function(widget, user.data) {
-	name <- user.data$name
+	name <- StateEnv$.current
 	if (StateEnv[[name]]$page == 1) { return() }
 	StateEnv[[name]]$page <- StateEnv[[name]]$page - 1
-	plotAndPlayUpdate(name)
+	plotAndPlayUpdate()
 }
 
 .plotAndPlay_nextpage_event <- function(widget, user.data) {
-	name <- user.data$name
+	name <- StateEnv$.current
 	StateEnv[[name]]$page <- StateEnv[[name]]$page + 1
-	plotAndPlayUpdate(name)
+	plotAndPlayUpdate()
+}
+
+plotAndPlayGetCurrState <- function() {
+	name <- StateEnv$.current
+	StateEnv[[name]]
+}
+
+plotAndPlaySetCurrState <- function(state) {
+	name <- StateEnv$.current
+	StateEnv[[name]] <- state
+	invisible(NULL)
 }
 
 # returns the new focus (col, row), which may be (0, 0), NULL if user cancelled
-plotAndPlayDoFocus <- function(name, highlight=T, ...) {
+plotAndPlayDoFocus <- function(highlight=T, ...) {
+	name <- StateEnv$.current
 	if (any(StateEnv[[name]]$focus)) {
 		return(StateEnv[[name]]$focus)
 	} else {
 		if (sum(trellis.currentLayout() > 0) == 1) {
 			highlight <- F
 		} else {
-			plotAndPlaySetPrompt(name, "First, choose a panel")
+			plotAndPlaySetPrompt("First, choose a panel")
 		}
 		tmp <- trellis.focus(highlight=highlight, ...)
 		return(tmp)
 	}
 }
 
-plotAndPlayUpdate <- function(name) {
+plotAndPlayUpdate <- function() {
+	name <- StateEnv$.current
 	result <- eval(StateEnv[[name]]$call)
 	if (inherits(result, "trellis")) {
 		# plot trellis object
@@ -1206,7 +1218,8 @@ plotAndPlayUpdate <- function(name) {
 			idCall <- StateEnv[[name]]$id.call
 			labels <- eval(idCall$labels)
 			if ('x' %in% names(idCall)) {
-				xy <- xy.coords(idCall$x, idCall$y, recycle=T)
+				xy <- xy.coords(eval(idCall$x), 
+					eval(idCall$y), recycle=T)
 			} else {
 				pargs <- trellis.panelArgs()
 				xy <- xy.coords(pargs$x, pargs$y, recycle=T)
@@ -1220,8 +1233,11 @@ plotAndPlayUpdate <- function(name) {
 				# next line same as: which(subscripts %in% ids)
 				ids <- findInterval(ids, subscripts)
 			}
-			panel.text(xy$x[ids], xy$y[ids], 
-				labels=labels[ids], pos=1, cex=0.7)
+			if (length(labels) > 0) {
+				label.args <- StateEnv[[name]]$label.args
+				do.call(panel.text, c(list(xy$x[ids], xy$y[ids], 
+					labels=labels[ids], pos=1), label.args))
+			}
 			trellis.unfocus()
 		}
 		# draw persistent brushing
@@ -1244,20 +1260,39 @@ plotAndPlayUpdate <- function(name) {
 			with(StateEnv[[name]]$focus, 
 				trellis.focus("panel", col, row))
 		}
+	} else {
+		# draw persistent labels
+		ids <- StateEnv[[name]]$ids$all
+		if (any(ids)) {
+			idCall <- StateEnv[[name]]$id.call
+			labels <- eval(idCall$labels)
+			xy <- xy.coords(eval(idCall$x), eval(idCall$y), recycle=T)
+			if (length(labels) == 0) {
+				labels <- seq_along(xy$x)
+			}
+			if (length(labels) > 0) {
+				label.args <- StateEnv[[name]]$label.args
+				do.call(text, c(list(xy$x[ids], xy$y[ids], 
+					labels=labels[ids], pos=1), label.args))
+			}
+		}
 	}
 	invisible(result)
 }
 
-plotAndPlayGetDA <- function(name) {
+plotAndPlayGetDA <- function() {
+	name <- StateEnv$.current
 	StateEnv[[name]]$win$getChildren()[[1]]$getChildren()[[1]]
 }
 
-plotAndPlayGetToolbar <- function(name) {
+plotAndPlayGetToolbar <- function() {
+	name <- StateEnv$.current
 	StateEnv[[name]]$win$getChildren()[[1]]$getChildren()[[2]]
 }
 
-plotAndPlayMakePrompt <- function(name) {
-	theToolbar <- plotAndPlayGetToolbar(name)
+plotAndPlayMakePrompt <- function() {
+	name <- StateEnv$.current
+	theToolbar <- plotAndPlayGetToolbar()
 	# first freeze the toolbar size so plot doesn't resize
 	toolbarSize <- theToolbar$getAllocation()
 	theToolbar$setSizeRequest(toolbarSize$width, toolbarSize$height)
@@ -1274,8 +1309,9 @@ plotAndPlayMakePrompt <- function(name) {
 	myLabel$modifyFg(GtkStateType['insensitive'], "black")
 }
 
-plotAndPlayUnmakePrompt <- function(name) {
-	theToolbar <- plotAndPlayGetToolbar(name)
+plotAndPlayUnmakePrompt <- function() {
+	name <- StateEnv$.current
+	theToolbar <- plotAndPlayGetToolbar()
 	theToolbar$getChildren()[[1]]$destroy()
 	toolItems <- theToolbar$getChildren()
 	for (x in toolItems) { x$show() }
@@ -1283,40 +1319,40 @@ plotAndPlayUnmakePrompt <- function(name) {
 	theToolbar$setSizeRequest(-1, -1)
 }
 
-plotAndPlaySetPrompt <- function(name, text) {
+plotAndPlaySetPrompt <- function(text) {
+	name <- StateEnv$.current
 	if (!is.character(text)) { stop("'text' must be character") }
-	theToolbar <- plotAndPlayGetToolbar(name)
+	theToolbar <- plotAndPlayGetToolbar()
 	myLabel <- theToolbar$getChildren()[[1]]$getChildren()[[1]]$getChildren()[[1]]
 	myLabel$setMarkup(paste(sep='','<big><b>', text, '</b></big>'))
 }
 
-
-latticeUnLog <- function(xlim, ylim, scalesArg) {
+latticeUnLog <- function(x, y, scalesArg) {
 	# x scale
 	if (!is.null(scalesArg$x$log)) {
 		logBase <- latticeLogBase(scalesArg$x$log)
 		if (!is.null(logBase)) {
-			xlim <- logBase ^ xlim
+			x <- logBase ^ x
 		}
 	} else {
 		logBase <- latticeLogBase(scalesArg$log)
 		if (!is.null(logBase)) {
-			xlim <- logBase ^ xlim
+			x <- logBase ^ x
 		}
 	}
 	# y scale
 	if (!is.null(scalesArg$y$log)) {
 		logBase <- latticeLogBase(scalesArg$y$log)
 		if (!is.null(logBase)) {
-			ylim <- logBase ^ ylim
+			y <- logBase ^ y
 		}
 	} else {
 		logBase <- latticeLogBase(scalesArg$log)
 		if (!is.null(logBase)) {
-			ylim <- logBase ^ ylim
+			y <- logBase ^ y
 		}
 	}
-	return(list(x=xlim, y=ylim))
+	return(list(x=x, y=y))
 }
 
 latticeLogBase <- function(x) {
@@ -1328,10 +1364,6 @@ latticeLogBase <- function(x) {
 	if (isTRUE(x)) { return(10) }
 	if (identical(x, "e")) { return(exp(1)) }
 	x
-}
-
-as.POSIXct.numeric <- function(x) {
-	structure(as.numeric(x), class = c("POSIXt", "POSIXct"))
 }
 
 evalCallArgs <- function(myCall, envir=parent.frame(), pattern=T) {
