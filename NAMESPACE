@@ -1,4 +1,3 @@
-#Imports: RGtk2 (>= 2.10.13), cairoDevice (>= 2.3)
 # no point in doing this because cairoDevice::asCairoDevice calls 'require(RGtk2)'
 #import(RGtk2)
 #import(cairoDevice)
@@ -7,10 +6,13 @@ import(grid)
 
 # the main function
 export(
-	plotAndPlay
+	playwith
 )
 
-# event handlers and supporting functions
+# event handlers 
+exportPattern("^\\.plotAndPlay_")
+
+# supporting functions
 export(
 	plotAndPlayButtons,
 	plotAndPlayBasicButtons,
@@ -23,33 +25,7 @@ export(
 	plotAndPlayUnmakePrompt,
 	plotAndPlaySetPrompt,
 	plotAndPlayGetToolbar,
-	plotAndPlayGetDA,
-	.plotAndPlay_window_focus_in_event,
-	.plotAndPlay_window_focus_out_event,
-	.plotAndPlay_close_event,
-	.plotAndPlay_save_event,
-	.plotAndPlay_copy_event,
-	.plotAndPlay_greyscale_event,
-	.plotAndPlay_zoomin_event,
-	.plotAndPlay_zoomout_event,
-	.plotAndPlay_zoomfit_event,
-	.plotAndPlay_centre_event,
-	.plotAndPlay_focus_event,
-	.plotAndPlay_expand_event,
-	.plotAndPlay_zero_event,
-	.plotAndPlay_logscale_event,
-	.plotAndPlay_prevpage_event,
-	.plotAndPlay_nextpage_event,
-	.plotAndPlay_identify_event,
-	.plotAndPlay_identify_region_event,
-	.plotAndPlay_brush_event,
-	.plotAndPlay_brush_region_event,
-	.plotAndPlay_brush_drag_event,
-	.plotAndPlay_clear_event,
-	.plotAndPlay_zoomin3d_event,
-	.plotAndPlay_zoomout3d_event,
-	.plotAndPlay_flyleft3d_event,
-	.plotAndPlay_flyright3d_event
+	plotAndPlayGetDA
 )
 
 # other GTK GUI stuff

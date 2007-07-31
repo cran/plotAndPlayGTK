@@ -52,13 +52,13 @@ guiDo <- function(expr, call, string, doLog=T, doFailureLog=doLog, logFunction=a
 	handleIt <- function(e) {
 		# show error dialog
 		if (doFailureDialog) {
-			commandText <- if (isString) { string } else {
+			commandText <- if (isString) string else {
 				paste(deparse(call), collapse="\n")
 			}
 			msgText <- conditionMessage(e)
 			callText <- deparse(conditionCall(e), width.cutoff=500)[1]
-			if (length(msgText)==0) { msgText <- "" }
-			if (length(callText)==0) { callText <- "" }
+			if (length(msgText)==0) msgText <- ""
+			if (length(callText)==0) callText <- ""
 			errorDialog(paste(sep='',
 				'A command has failed. The error was:',
 				'\n\n<span foreground="#aa0000">', 
@@ -140,31 +140,36 @@ pangoEscape <- function(x) {
 	x
 }
 
-guiTextInput <- function(text="", title="Text Input", prompt="") {
+guiTextInput <- function(text="", title="Text Input", prompt="", accepts.tab=T) {
 	# construct dialog
 	editBox <- gtkDialog(title=title, NULL, NULL,
 		"OK", GtkResponseType["ok"], "Cancel", GtkResponseType["cancel"],
 		show = F)
 	editBox$setDefaultResponse(GtkResponseType["ok"])
-	editBox$setDefaultSize(400,300)
+	editBox$setDefaultSize(600,400)
 	if (nchar(prompt) > 0) {
 		editBox[["vbox"]]$packStart(gtkLabel(prompt), expand=F, pad=2)
 	}
 	editTV <- gtkTextView()
 	setTextviewMonospace(editTV)
+	editTV$setWrapMode(GtkWrapMode["word"])
+	editTV$setAcceptsTab(accepts.tab)
 	setTextview(editTV, text)
-	editBox[["vbox"]]$add(editTV)
+	scroller <- gtkScrolledWindow()
+	scroller$add(editTV)
+	scroller$setPolicy(GtkPolicyType["automatic"], GtkPolicyType["automatic"])
+	editBox[["vbox"]]$add(scroller)
 	result <- editBox$run() # make it modal
 	newTxt <- getTextviewText(editTV)
 	editBox$destroy()
-	if (result != GtkResponseType["ok"]) { return(invisible(NULL)) }
+	if (result != GtkResponseType["ok"]) return(invisible(NULL))
 	newTxt
 }
 
 ## EDIT DATA FRAMES AS TEXT
 
 editAsText <- function(x, title=NULL, edit.row.names=any(row.names(x) != 1:nrow(x))) {
-	if (!is.data.frame(x)) { stop("'x' must be a data frame") }
+	if (!is.data.frame(x)) stop("'x' must be a data frame")
 	if (is.null(title)) {
 		title <- paste("Editing", deparse(substitute(x)))
 	}
@@ -174,7 +179,7 @@ editAsText <- function(x, title=NULL, edit.row.names=any(row.names(x) != 1:nrow(
 		col.names=if (edit.row.names) {NA} else {T})
 	)
 	tableTxt <- paste(paste(foo, collapse="\n"), "\n", sep='')
-	if (edit.row.names) { tableTxt <- paste("row.names", tableTxt, sep='') }
+	if (edit.row.names) tableTxt <- paste("row.names", tableTxt, sep='')
 	# show text box and repeat if there was an error
 	readOK <- F
 	while (!readOK) {
@@ -183,7 +188,7 @@ editAsText <- function(x, title=NULL, edit.row.names=any(row.names(x) != 1:nrow(
 				"or edit the text here (in tab-separated format).\n",
 				"Do not move the columns around,",
 				"they must stay in this order."))
-		if (is.null(newTableTxt)) { return(x) }
+		if (is.null(newTableTxt)) return(x)
 		# convert table text block back to data frame
 		zz <- textConnection(newTableTxt)
 		newData <- tryCatch(
@@ -267,7 +272,7 @@ choose.file.save <- function(default="", caption="Save File", filters=Filters[c(
 			ff$addPattern(x)
 		}
 		dialog$addFilter(ff)
-		if (i == index) { dialog$setFilter(ff) }
+		if (i == index) dialog$setFilter(ff)
 	}
 	
 	#dialog$setDoOverwriteConfirmation(T) crap, appears behind filechooser

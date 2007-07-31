@@ -66,7 +66,7 @@ plotAndPlayGetDA()
   Otherwise the user is prompted to choose one. 
   It returns the new focus (see \code{focus} item below) or NULL if the user cancelled.
   
-  The plotAndPlay \code{\link{plotAndPlay}} window can show a simple prompt to the user.
+  The \code{\link{plotAndPlay}} window can show a simple prompt to the user.
   This must be initialised with \code{plotAndPlayMakePrompt}, then set with \code{plotAndPlaySetPrompt}, 
   and finally removed with \code{plotAndPlayUnmakePrompt}.
   
@@ -107,7 +107,7 @@ showids_handler <- function(widget, user.data) {
 }
 showids_button <- quote(quickTool("Show IDs", "gtk-yes", 
 	tooltip="Print out indices of the selected points", f=showids_handler))
-plotAndPlay(xyplot(Income ~ Population / Area, data=data.frame(state.x77)), 
+playwith(xyplot(Income ~ Population / Area, data=data.frame(state.x77)), 
 	extra.buttons=list(showids_button))
 
 ## A toggle button to add a smoothing line to xyplot
@@ -115,7 +115,7 @@ plotAndPlay(xyplot(Income ~ Population / Area, data=data.frame(state.x77)),
 smooth_handler <- function(widget, user.data) {
 	tmp.state <- plotAndPlayGetCurrState()
 	# get the current 'type' argument
-	plotType <- eval(tmp.state$call$type)
+	plotType <- eval(tmp.state$call$type, tmp.state$env)
 	if (is.null(plotType)) plotType <- "p"
 	# remove "smooth" type if it is already there
 	if (!is.na(i <- match("smooth", plotType))) plotType <- plotType[-i]
@@ -128,7 +128,7 @@ smooth_handler <- function(widget, user.data) {
 }
 smooth_button <- quote(quickTool("Smooth", "gtk-add", f=smooth_handler, 
 	tooltip="Overlay loess smooth (with default span=2/3)", isToggle=T))
-plotAndPlay(xyplot(sunspot.year ~ 1700:1988, type="l"), 
+playwith(xyplot(sunspot.year ~ 1700:1988, type="l"), 
 	extra.buttons=list(smooth_button))
 
 ## Get the current plot limits and print them (works with lattice / traditional)
@@ -161,15 +161,16 @@ showlims_handler <- function(widget, user.data) {
 }
 showlims_button <- quote(quickTool("Limits", "gtk-yes",
 	tooltip="Print out current plot limits", f=showlims_handler))
-plotAndPlay(xyplot(Income ~ Population / Area, data=data.frame(state.x77)), 
+playwith(xyplot(Income ~ Population / Area, data=data.frame(state.x77)), 
 	extra.buttons=c(list("logscale", "zero"), showlims_button))
 
 ## A more complex toolbar item:
 ## A "spinbutton" to choose a number 'n', then group the data into 'n' clusters.
+## Should work with plot or xyplot.
 my_cluster_handler <- function(widget, user.data) {
 	tmp.state <- plotAndPlayGetCurrState()
 	n <- widget[["value"]]
-	xy <- xy.coords(eval(tmp.state$call$x), eval(tmp.state$call$y), recycle=T)
+	xy <- plotAndPlayGTK:::xy.coords.call(tmp.state$call, tmp.state$env)
 	groups <- NULL
 	if (n > 1) {
 		clusts <- kmeans(cbind(xy$x,xy$y), n)
@@ -177,7 +178,10 @@ my_cluster_handler <- function(widget, user.data) {
 		groups <- factor(clusts$cluster, labels=labels)
 	}
 	# update state
-	tmp.state$call$groups <- groups
+	# tmp.state$call$groups <- groups
+	# to avoid putting a big vector in the plot call, store in local env:
+	assign("auto_groups", groups, envir=tmp.state$env)
+	tmp.state$call$groups <- if (!is.null(groups)) quote(auto_groups)
 	plotAndPlaySetCurrState(tmp.state)
 	plotAndPlayUpdate()
 }
@@ -192,10 +196,10 @@ my_cluster_spinner <- quote({
 	foo$add(vbox)
 	foo
 })
-# need to generate random data first (or use eval.args=T), otherwise it changes!
+# need to generate random data outside the plot call, otherwise it changes!
 xdata <- rnorm(100)
 ydata <- rnorm(100) * xdata / 2
-plotAndPlay(xyplot(ydata ~ xdata, aspect="iso", auto.key=list(space="right")), 
+playwith(xyplot(ydata ~ xdata, aspect="iso", auto.key=list(space="right")), 
 	extra.buttons=list(my_cluster_spinner))
 
 }

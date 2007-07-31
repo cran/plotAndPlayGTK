@@ -8,7 +8,7 @@
 \usage{
 editAsText(x, title = NULL, edit.row.names = any(row.names(x) != 1:nrow(x)))
 
-guiTextInput(text = "", title = "Text Input", prompt = "")
+guiTextInput(text = "", title = "Text Input", prompt = "", accepts.tab = T)
 }
 \arguments{
   \item{x}{ ~~Describe \code{x} here~~ }
@@ -16,6 +16,7 @@ guiTextInput(text = "", title = "Text Input", prompt = "")
   \item{edit.row.names}{ ~~Describe \code{edit.row.names} here~~ }
   \item{text}{ ~~Describe \code{text} here~~ }
   \item{prompt}{ ~~Describe \code{prompt} here~~ }
+  \item{accepts.tab}{ ~~Describe \code{accepts.tab} here~~ }
 }
 \details{
   ~~ If necessary, more details than the description above ~~
