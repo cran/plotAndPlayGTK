@@ -9,14 +9,15 @@
 
 # generally useful RGtk2 GUI things
 
-guiDo <- function(expr, call, string, doLog=T, doFailureLog=doLog, logFunction=addToLog, doFailureDialog=T, doStop=T, envir=if (doLog) .GlobalEnv else parent.frame()) {
-	if (missing(expr) + missing(call) + missing(string) != 2) {
-		stop("Give one of 'expr', 'call' or 'string'")
-	}
-	if (missing(string) && missing(call)) {
-		call <- substitute(expr)
-	}
-	isString <- !missing(string)
+guiDo <- function(expr, call, doLog=T, doFailureLog=doLog, 
+	logFunction=addToLog, doFailureDialog=T, doStop=T, 
+	envir=if (doLog) .GlobalEnv else parent.frame()) {
+	
+	if (missing(call) == missing(expr)) stop("give only one of 'expr' and 'call'")
+	if (missing(call)) call <- substitute(expr)
+	isString <- (mode(call) == "character")
+	string <- if (isString) call
+	
 	# set default log function in case 'addToLog' is not defined
 	if (doLog || doFailureLog) {
 		if (inherits(try(eval(logFunction), silent=T), "try-error")
@@ -28,12 +29,10 @@ guiDo <- function(expr, call, string, doLog=T, doFailureLog=doLog, logFunction=a
 	if (doLog) {
 		theCall <- if (isString) {
 			try(parse(text=string)[[1]], silent=T)
-		} else {
-			call
-		}
+		} else call
 		if (isString && inherits(theCall, "try-error")) {
 			# syntax error
-			logFunction(string)
+			logFunction(call)
 		} else {
 			callPretty <- paste(capture.output(
 				# if the code is in a simple block, omit braces
@@ -140,19 +139,20 @@ pangoEscape <- function(x) {
 	x
 }
 
-guiTextInput <- function(text="", title="Text Input", prompt="", accepts.tab=T) {
+guiTextInput <- function(text="", title="Text Input", prompt="", accepts.tab=T, wrap.mode=c("none", "char", "word", "word_char")) {
+	wrap.mode <- match.arg(wrap.mode)
 	# construct dialog
 	editBox <- gtkDialog(title=title, NULL, NULL,
 		"OK", GtkResponseType["ok"], "Cancel", GtkResponseType["cancel"],
 		show = F)
 	editBox$setDefaultResponse(GtkResponseType["ok"])
-	editBox$setDefaultSize(600,400)
+	editBox$setDefaultSize(640,400)
 	if (nchar(prompt) > 0) {
 		editBox[["vbox"]]$packStart(gtkLabel(prompt), expand=F, pad=2)
 	}
 	editTV <- gtkTextView()
 	setTextviewMonospace(editTV)
-	editTV$setWrapMode(GtkWrapMode["word"])
+	editTV$setWrapMode(GtkWrapMode[wrap.mode])
 	editTV$setAcceptsTab(accepts.tab)
 	setTextview(editTV, text)
 	scroller <- gtkScrolledWindow()

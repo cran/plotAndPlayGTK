@@ -80,6 +80,7 @@ plotAndPlayGetDA()
   \item{dev}{the plot device number.}
   \item{call}{the current plot call.}
   \item{id.call}{the call to \code{\link{identify}} or similar, used to label data points.}
+  \item{env}{local environment used to store evaluated plot call arguments.}
   \item{label.args}{style arguments for labelling points.}
   \item{nav.scales}{see \code{\link{plotAndPlay}}.}
   \item{trans.scales}{see \code{\link{plotAndPlay}}.}

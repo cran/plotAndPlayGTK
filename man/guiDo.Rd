@@ -5,12 +5,12 @@
   ~~ A concise (1-5 lines) description of what the function does. ~~
 }
 \usage{
-guiDo(expr, call, string, doLog = T, doFailureLog = doLog, logFunction = addToLog, doFailureDialog = T, doStop = T, envir = if (doLog) .GlobalEnv else parent.frame() )
+guiDo(expr, call, doLog = T, doFailureLog = doLog, logFunction = addToLog, 
+      doFailureDialog = T, doStop = T, envir = if (doLog) .GlobalEnv else parent.frame() )
 }
 \arguments{
   \item{expr}{ ~~Describe \code{expr} here~~ }
   \item{call}{ ~~Describe \code{call} here~~ }
-  \item{string}{ ~~Describe \code{string} here~~ }
   \item{doLog}{ ~~Describe \code{doLog} here~~ }
   \item{doFailureLog}{ ~~Describe \code{doFailureLog} here~~ }
   \item{logFunction}{ ~~Describe \code{logFunction} here~~ }

@@ -6,7 +6,7 @@
 
 MAJOR <- "0"
 MINOR <- "8"
-REVISION <- unlist(strsplit("$Revision: 42 $", split=" "))[2]
+REVISION <- unlist(strsplit("$Revision: 46 $", split=" "))[2]
 VERSION <- paste(MAJOR, MINOR, REVISION, sep=".")
 COPYRIGHT <- paste("(c) 2007 Felix Andrews <felix@nfrac.org>",
 	"with contributions from Deepayan Sarkar and Graham Williams")
@@ -28,7 +28,9 @@ WEBSITE <- "http://code.google.com/p/plotandplay-gtk/"
 ## along with this program; if not, write to the Free Software
 ## Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
-StateEnv <- new.env()
+if (!exists("StateEnv", environment(), inherits=FALSE)) {
+	StateEnv <- new.env()
+}
 
 plotAndPlayButtons <- alist(
 	identify=makeIdentifyMenuButton(),
@@ -47,6 +49,8 @@ plotAndPlayButtons <- alist(
 	zoomout.3d=quickTool("Zoom out", "gtk-zoom-out", f=.plotAndPlay_zoomout3d_event),
 	fly.left.3d=quickTool("Fly left", "gtk-media-rewind-ltr", f=.plotAndPlay_flyleft3d_event),
 	fly.right.3d=quickTool("Fly right", "gtk-media-rewind-rtl", f=.plotAndPlay_flyright3d_event),
+	#fly.up.3d=quickTool("Fly up", "gtk-go-up", f=.plotAndPlay_flyup3d_event),
+	#fly.down.3d=quickTool("Fly down", "gtk-go-down", f=.plotAndPlay_flydown3d_event),
 	focus=quickTool("Choose panel", "gtk-select-color", tooltip="Choose a panel to focus on (for further interaction)", f=.plotAndPlay_focus_event),
 	expand=quickTool("Expand panel", "gtk-fullscreen", tooltip="Choose a panel to expand and focus (for further interaction)", f=.plotAndPlay_expand_event, isToggle=T),
 	prev.page=quickTool("Prev page", "gtk-go-back-ltr", f=.plotAndPlay_prevpage_event),
@@ -117,23 +121,15 @@ makeSaveMenuButton <- function() {
 
 # look at rpanel and tkwidgets and GeoXP and iplots etc
 
-# more support for traditional plots:
-# - identify region
-# - 3d?
-
 # get labels from formula rownames
 
-# TODO: transform data in formula - sqrt - `.transform`?
-
-#"gtk-preferences" (plot type, symbol, titles, etc?)
-
-#"gtk-find" (identify label grep)
+# superpose button:
+# off = ~ data | which
+# on = ~ data,  groups=which
+# hmm = data ~ which
 
 #gdkPixbufGetFromDrawable(dest = NULL, src, cmap = NULL, src.x, src.y, dest.x, dest.y, width, height)
 #"gtk-index" (layers)
-#"gtk-italic" (edit labels/titles)
-#"gtk-undo-ltr" (undo)
-#"gtk-go-down" (fly down 3d)
 # TODO: xlim / ylim list if scales$relation %in% c("free", "sliced")
 
 latticeNames <- c("barchart", "bwplot", "cloud", "contourplot", "densityplot", 
@@ -144,8 +140,8 @@ playwith <- function(expr, name="plot", nav.scales=c("x","y"), trans.scales=c("y
 	buttons=list("identify", "zoomin", "zoomout", "zoomfit", "centre"), 
 	extra.buttons=list("zero"), basic.buttons=plotAndPlayBasicButtons, 
 	labels=NULL, label.args=list(cex=0.7), identify.call=NULL, plot.call, 
-	is.lattice=(callName %in% latticeNames), eval.args=NA, envir=parent.frame(), 
-	restore.on.close=NULL) {
+	is.lattice=(callName %in% latticeNames), eval.args=NA, invert.match=F,
+	envir=parent.frame(), restore.on.close=NULL) {
 	
 	if (missing(plot.call) == missing(expr)) stop("give only one of 'expr' and 'plot.call'")
 	if (missing(plot.call)) plot.call <- substitute(expr)
@@ -169,16 +165,13 @@ playwith <- function(expr, name="plot", nav.scales=c("x","y"), trans.scales=c("y
 	# put call into canonical form and maybe evaluate its arguments
 	plot.call <- match.call(eval(plot.call[[1]], envir), plot.call)
 	env <- new.env()
-	if (is.na(eval.args)) {
-		if (environmentName(envir) != "R_GlobalEnv") {
-			copyArgsIntoEnv(plot.call, envir=envir, newEnv=env)
-		}
-	} else if (!identical(eval.args, FALSE)) {
-		copyArgsIntoEnv(plot.call, envir=globalenv(), newEnv=env)
-		copyArgsIntoEnv(plot.call, envir=envir, newEnv=env)
+	# work out evalulation rules
+	inherits <- !is.na(eval.args)
+	if (is.na(eval.args)) eval.args <- (environmentName(envir) != "R_GlobalEnv")
+	if (!identical(eval.args, FALSE)) {
+		copyArgsIntoEnv(plot.call, envir=envir, newEnv=env, inherits=inherits, 
+			pattern=eval.args, invert.match=invert.match)
 	}
-	#plot.call <- substitute.call(plot.call, envir)
-	#plot.call <- evalCallArgs(plot.call, envir=envir, pattern=eval.args)
 	callName <- deparse(plot.call[[1]])
 	# lattice check
 	if (is.lattice && !exists("panel.brush.splom")) {
@@ -369,7 +362,8 @@ playwith <- function(expr, name="plot", nav.scales=c("x","y"), trans.scales=c("y
 	if (!is.null(StateEnv[[name]]$win)) {
 		try(StateEnv[[name]]$win$destroy())
 	}
-	if (!is.null(StateEnv[[name]]$restore.on.close)) {
+	if (!is.null(StateEnv[[name]]$restore.on.close) 
+	&& (!inherits(StateEnv[[name]]$restore.on.close, "<invalid>"))) {
 		try(StateEnv[[name]]$restore.on.close$present())
 	}
 	rm(list=name, envir=StateEnv)
@@ -780,8 +774,8 @@ playwith <- function(expr, name="plot", nav.scales=c("x","y"), trans.scales=c("y
 
 .plotAndPlay_identify_region_event <- function(widget, user.data) {
 	name <- StateEnv$.current
-	nav.x <- ("x" %in% StateEnv[[name]]$nav.scales)
-	nav.y <- ("y" %in% StateEnv[[name]]$nav.scales)
+	nav.x <- T
+	nav.y <- T
 	# disable other plot buttons until this is over
 	plotAndPlayGetToolbar()$setSensitive(F)
 	on.exit(plotAndPlayGetToolbar()$setSensitive(T))
@@ -1159,7 +1153,8 @@ playwith <- function(expr, name="plot", nav.scales=c("x","y"), trans.scales=c("y
 	plotAndPlayGetToolbar()$setSensitive(F)
 	on.exit(plotAndPlayGetToolbar()$setSensitive(T))
 	theCall <- StateEnv[[name]]$call
-	callTxt <- paste(deparse(theCall), collapse="\n")
+	callTxt <- paste(deparse(theCall, control=c("showAttributes"),
+		width=54), collapse="\n")
 	repeat {
 		newTxt <- guiTextInput(callTxt, title="Edit plot call", 
 			prompt="", accepts.tab=F)
@@ -1199,6 +1194,18 @@ playwith <- function(expr, name="plot", nav.scales=c("x","y"), trans.scales=c("y
 .plotAndPlay_flyright3d_event <- function(widget, user.data) {
 	name <- StateEnv$.current
 	StateEnv[[name]]$call$screen <- c(z=-45, StateEnv[[name]]$call$screen)
+	plotAndPlayUpdate()
+}
+
+.plotAndPlay_flyup3d_event <- function(widget, user.data) {
+	name <- StateEnv$.current
+	StateEnv[[name]]$call$screen <- c(z=45, StateEnv[[name]]$call$screen)
+	plotAndPlayUpdate()
+}
+
+.plotAndPlay_flydown3d_event <- function(widget, user.data) {
+	name <- StateEnv$.current
+	StateEnv[[name]]$call$screen <- c(z=45, StateEnv[[name]]$call$screen)
 	plotAndPlayUpdate()
 }
 
@@ -1408,20 +1415,33 @@ xy.coords.call <- function(the.call, envir=parent.frame(), log=NULL, recycle=TRU
 substitute.call <- function(the.call, ...) 
 	do.call(substitute, list(the.call, ...))
 
-copyArgsIntoEnv <- function(the.call, envir=parent.frame(), newEnv) {
+copyArgsIntoEnv <- function(the.call, envir=parent.frame(), newEnv, inherits=F, pattern=T, invert.match=F) {
 	stopifnot(is.call(the.call) || is.list(the.call))
+	isMatch <- !invert.match
 	for (i in seq_along(the.call)) {
 		if (is.call(the.call) && (i == 1)) next
 		this.arg <- the.call[[i]]
+		# skip literal symbol in "$" extractor
+		if (is.call(this.arg) && this.arg[[1]] == as.symbol("$"))
+			this.arg <- this.arg[[2]]
+		
 		if (mode(this.arg) %in% c("call", "(", "list")) {
-			copyArgsIntoEnv(this.arg, envir=envir, newEnv=newEnv)
+			# call recursively...
+			copyArgsIntoEnv(this.arg, envir=envir, newEnv=newEnv,
+				inherits=inherits, pattern=pattern, 
+				invert.match=invert.match)
 		} else if (mode(this.arg) %in% "name") {
 			this.name <- as.character(this.arg)
-			if (exists(this.name, envir=envir, inherits=F)) {
+			if (!isTRUE(pattern) && 
+				(any(grep(pattern, this.name))) != isMatch)
+				next
+			if (exists(this.name, envir=envir, inherits=inherits)
+			&& !exists(this.name, envir=newEnv, inherits=F)) {
 				assign(this.name, eval(this.arg, envir=envir),
 					envir=newEnv)
 			}
 		}
+		# leave constants and expressions alone
 	}
 }
 

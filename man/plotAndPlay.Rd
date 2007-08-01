@@ -10,8 +10,8 @@ playwith(expr, name = "plot", nav.scales = c("x","y"), trans.scales = c("y"),
 	 buttons = list("identify", "zoomin", "zoomout", "zoomfit", "centre"), 
 	 extra.buttons = list("zero"), basic.buttons=plotAndPlayBasicButtons, 
 	 labels = NULL, label.args = list(cex = 0.7), identify.call = NULL, 
-	 plot.call, is.lattice = (callName \%in\% latticeNames), 
-	 eval.args = NA, envir = parent.frame(), restore.on.close = NULL)
+	 plot.call, is.lattice = (callName \%in\% latticeNames), eval.args = NA, 
+	 invert.match = F, envir = parent.frame(), restore.on.close = NULL)
 }
 \arguments{
   \item{expr}{ an expression to create a plot, like \code{plot(mydata)}. 
@@ -34,7 +34,9 @@ playwith(expr, name = "plot", nav.scales = c("x","y"), trans.scales = c("y"),
   \item{plot.call}{ a plot call ( \code{\link{call}} object), if given this is used instead of \code{expr}. }
   \item{is.lattice}{ whether the plot is a \link[lattice]{Lattice} plot, i.e. returns a trellis object.
   	If the called function is in the \code{lattice} package it will be recognised automatically. }
-  \item{eval.args}{ \code{NA}, \code{TRUE} or \code{FALSE}, whether to evaluate the plot call arguments. See below. }
+  \item{eval.args}{ whether to evaluate the plot call arguments: can be \code{TRUE}, \code{FALSE}, \code{NA} (don't eval global vars) 
+	or a \link[=regex]{regular expression} matching symbols to evaluate. See below. }
+  \item{invert.match}{ whether to evaluate arguments that do NOT match the regular expression given in \code{eval.args}. }
   \item{envir}{ \code{\link{environment}} to use in evaluating the call arguments (see \code{eval.args}) }
   \item{restore.on.close}{ a \code{gtkWindow} to bring to front when the plot window is closed. }
 }
@@ -55,6 +57,8 @@ playwith(expr, name = "plot", nav.scales = c("x","y"), trans.scales = c("y"),
   }
   See \code{\link{plotAndPlayButtons}} if you want to define new buttons.
   
+  The interaction features require that all variables appearing in the plot call remain accessible:
+  
   The default setting \code{eval.args=NA} causes variables appearing in the plot call to be 
   \link[=eval]{evaluated} and stored, except if they are defined in the global environment (i.e. user workspace). 
   This method should work in most cases, but:
@@ -64,12 +68,17 @@ playwith(expr, name = "plot", nav.scales = c("x","y"), trans.scales = c("y"),
   Changes to variables in the global environment will also cause inconsistencies in previously generated plots 
   (e.g. \code{labels} on data points may be wrong).
   
-  If (\code{eval.args=T}) then variables appearing in the plot call will be evaluated and stored
-  even if they are defined in the global environment. Use this if the global variables might change before the plot is destroyed.
+  If \code{eval.args=T} then variables appearing in the plot call will be evaluated and stored
+  even if they are defined in the global environment. 
+  Use this if the global variables might change (or be removed) before the plot is destroyed.
   
-  If arguments to the plot call are not evaluated until plot time (\code{eval.args=F}) then the plot call will be left as it was given,
-  but the plot will depend on all the variables used as arguments remaining accessible (i.e. in the global environment). 
-  So this does not work inside a function -- interaction will fail.
+  If a regular expression is given for \code{eval.args} then only variables whose names match it will be evaluated,
+  and this includes global variables, as with \code{eval.args=T}. 
+  In this case you can set \code{invert.match=T} to evaluate variables that are not matched.
+  For example \code{eval.args="^tmp"} will evaluate variables whose names begin with "tmp";
+  \code{eval.args="^foo$", invert=T} will evaluate everything except \code{foo}.
+  
+  If \code{eval.args=F} then the plot call will be left alone (not evaluated until plot time).
 }
 \value{
 	\code{playwith} invisibly returns the value from the plot call
@@ -102,6 +111,16 @@ playwith(plot(treering2), nav.scales="x", trans.scales="y",
 
 ## see what the current call is (for last focused plot window)
 str(as.list(plotAndPlayGetCurrState()$call))
+
+## example of evaluating plot arguments
+globalOne <- 1:10
+localStuff <- function() {
+	localOne <- 10:1
+	playwith(plot(localOne, globalOne))
+}
+localStuff()
+## see which objects have been copied and stored with the plot
+sapply(plotAndPlayGetCurrState()$env, object.size)
 
 ## simple brushing is possible, based on lattice::panel.brush.splom
 playwith(splom(environmental))
