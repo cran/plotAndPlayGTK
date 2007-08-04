@@ -11,7 +11,7 @@
 
 guiDo <- function(expr, call, doLog=T, doFailureLog=doLog, 
 	logFunction=addToLog, doFailureDialog=T, doStop=T, 
-	envir=if (doLog) .GlobalEnv else parent.frame()) {
+	envir=if (doLog) .GlobalEnv else parent.frame(), ...) {
 	
 	if (missing(call) == missing(expr)) stop("give only one of 'expr' and 'call'")
 	if (missing(call)) call <- substitute(expr)
@@ -22,7 +22,7 @@ guiDo <- function(expr, call, doLog=T, doFailureLog=doLog,
 	if (doLog || doFailureLog) {
 		if (inherits(try(eval(logFunction), silent=T), "try-error")
 		|| !is.function(eval(logFunction))) {
-			logFunction <- print
+			logFunction <- function(x) cat(x, "\n")
 		}
 	}
 	# log it
@@ -32,18 +32,15 @@ guiDo <- function(expr, call, doLog=T, doFailureLog=doLog,
 		} else call
 		if (isString && inherits(theCall, "try-error")) {
 			# syntax error
-			logFunction(call)
+			logFunction(string)
 		} else {
-			callPretty <- paste(capture.output(
+			callPretty <- paste(
 				# if the code is in a simple block, omit braces
 				if (identical(theCall[[1]], as.symbol("{"))) {
-					for (i in 2:length(theCall)) {
-						print(theCall[[i]])
-					}
+					unlist(lapply(theCall[-1], deparse, ...))
 				} else {
-					print(theCall)
-				}
-			), collapse="\n")
+					deparse(theCall, ...)
+				}, collapse="\n")
 			logFunction(callPretty)
 		}
 	}
@@ -52,7 +49,7 @@ guiDo <- function(expr, call, doLog=T, doFailureLog=doLog,
 		# show error dialog
 		if (doFailureDialog) {
 			commandText <- if (isString) string else {
-				paste(deparse(call), collapse="\n")
+				paste(deparse(call, ...), collapse="\n")
 			}
 			msgText <- conditionMessage(e)
 			callText <- deparse(conditionCall(e), width.cutoff=500)[1]
@@ -84,11 +81,12 @@ guiDo <- function(expr, call, doLog=T, doFailureLog=doLog,
 		return(e)
 	}
 	# evaluate it
+	enclos <- if (is.list(envir) || is.pairlist(envir)) parent.frame() else baseenv()
 	if (isString) {
-		result <- tryCatch(eval(parse(text=string), envir=envir), 
-			error=handleIt)
+		result <- tryCatch(eval(parse(text=string), envir=envir,
+			enclos=enclos), error=handleIt)
 	} else {
-		result <- tryCatch(eval(call, envir=envir), 
+		result <- tryCatch(eval(call, envir=envir, enclos=enclos), 
 			error=handleIt)
 	}
 	return(result)
@@ -227,6 +225,7 @@ setTextview <- function(tv, ..., sep="")
   msg <- paste(sep=sep, ...)
   if (length(msg) == 0) msg <-""
   tv$getBuffer()$setText(msg)
+  invisible(NULL)
 }
 
 addTextview <- function(tv, ..., sep="")
@@ -236,6 +235,7 @@ addTextview <- function(tv, ..., sep="")
   tv.buf <- tv$getBuffer()
   loc <- tv.buf$getEndIter()$iter
   tv.buf$insert(loc, msg)
+  invisible(NULL)
 }
 
 getTextviewText <- function(tv)
@@ -250,6 +250,7 @@ getTextviewText <- function(tv)
 setTextviewMonospace <- function(tv)
 {
   tv$modifyFont(pangoFontDescriptionFromString("monospace 10"))
+  invisible(NULL)
 }
 
 Filters <- structure(c("R or S files (*.R,*.q,*.ssc,*.S)", "Postscript files (*.ps)", "PDF files (*.pdf)", "Png files (*.png)",  "Jpeg files (*.jpeg,*.jpg)",  "Text files (*.txt)", "R images (*.RData,*.rda)", "Zip files (*.zip)",  "All files (*.*)", "*.R;*.q;*.ssc;*.S", "*.ps", "*.pdf",  "*.png", "*.jpeg;*.jpg", "*.txt", "*.RData;*.rda", "*.zip",  "*.*"), .Dim = c(9L, 2L), .Dimnames = list(c("R", "ps",  "pdf", "png", "jpeg", "txt", "RData", "zip", "All"), NULL))

@@ -19,6 +19,7 @@
 \alias{.plotAndPlay_brush_region_event}
 \alias{.plotAndPlay_brush_drag_event}
 \alias{.plotAndPlay_clear_event}
+\alias{.plotAndPlay_edit_event}
 \alias{.plotAndPlay_zoomin3d_event}
 \alias{.plotAndPlay_zoomout3d_event}
 \alias{.plotAndPlay_flyleft3d_event}

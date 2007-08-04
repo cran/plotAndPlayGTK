@@ -11,6 +11,11 @@
 \alias{plotAndPlaySetPrompt}
 \alias{plotAndPlayGetToolbar}
 \alias{plotAndPlayGetDA}
+\alias{plotAndPlaySetRawXLim}
+\alias{plotAndPlaySetRawYLim}
+\alias{unlogX}
+\alias{unlogY}
+\alias{xy.coords.call}
 \title{Utilities for plotAndPlayGTK buttons}
 \description{
   Make new buttons for a \code{\link{plotAndPlay}} plot window.
@@ -33,6 +38,15 @@ plotAndPlaySetPrompt(text)
 
 plotAndPlayGetToolbar()
 plotAndPlayGetDA()
+
+plotAndPlaySetRawXLim(x)
+plotAndPlaySetRawYLim(x)
+
+unlogX(x, the.call, is.lattice = T)
+unlogY(x, the.call, is.lattice = T)
+
+xy.coords.call(the.call, envir = parent.frame(), log = NULL, recycle = TRUE)
+
 }
 \arguments{
   \item{label}{ the button label. }
@@ -45,6 +59,11 @@ plotAndPlayGetDA()
   \item{state}{ a list containing state information for the plot window. See below. }
   \item{highlight, \dots}{ passed to \code{\link{trellis.focus}}. }
   \item{text}{ text to display in the plot window prompt. }
+  \item{x}{ numeric vector. }
+  \item{the.call}{ a plot call. Ignored if \code{is.lattice=F}. }
+  \item{is.lattice}{ whether the plot call generates a lattice plot. }
+  \item{envir}{ environment in which to evaluate call arguments. }
+  \item{log, recycle}{ passed to \code{\link[grDevices]{xy.coords}}. }
 }
 \details{
   \code{plotAndPlayButtons} and \code{plotAndPlayBasicButtons} are lists of calls to generate \code{\link[RGtk2]{gtkToolItem}}s.
@@ -73,6 +92,14 @@ plotAndPlayGetDA()
   \code{plotAndPlayGetToolbar} returns the \code{gtkToolbar}, 
   and \code{plotAndPlayGetDA} returns the \code{gtkDrawingArea}.
   
+  \code{plotAndPlaySetRawXLim} converts a numeric range, in the raw native plot coordinates, to a values suitable for 
+  the plot \code{xlim} argument: it may convert back from log-transformed scales, convert to factor levels,
+  and convert to a date/time format. It then updates the current plot call with the new value.
+  Note: this function requires a panel to be in focus, since it uses \code{trellis.panelArgs()}. 
+  
+  \code{unlogX} just converts back from log-transformed scales if necessary.
+  
+  \code{xy.coords.call} is a wrapper around \code{xy.coords} based on the call arguments.
 }
 \value{
   \code{plotAndPlayGetCurrState} returns a list containing at least:
@@ -121,7 +148,7 @@ smooth_handler <- function(widget, user.data) {
 	# remove "smooth" type if it is already there
 	if (!is.na(i <- match("smooth", plotType))) plotType <- plotType[-i]
 	# add "smooth" type if the toggle button is active
-	if (widget[["active"]]) plotType <- c(plotType, "smooth")
+	if (widget["active"]) plotType <- c(plotType, "smooth")
 	# update state
 	tmp.state$call$type <- plotType
 	plotAndPlaySetCurrState(tmp.state)
@@ -145,24 +172,19 @@ showlims_handler <- function(widget, user.data) {
 		require(grid)
 		xlim <- convertX(unit(0:1, "npc"), "native", valueOnly=T)
 		ylim <- convertY(unit(0:1, "npc"), "native", valueOnly=T)
-		if (!any(tmp.state$focus)) { trellis.unfocus() }
-		# convert back from log scale if required
-		newlims <- plotAndPlayGTK:::latticeUnLog(xlim, ylim, 
-			tmp.state$call$scales)
-		xlim <- newlims$x
-		ylim <- newlims$y
+		if (!any(tmp.state$focus)) trellis.unfocus()
 	} else {
 		# traditional graphics plot
 		xlim <- par("usr")[1:2]
 		ylim <- par("usr")[3:4]
-		if (par("xlog")) xlim <- 10 ^ xlim
-		if (par("ylog")) ylim <- 10 ^ ylim
 	}
+	xlim <- unlogX(xlim, tmp.state$call, tmp.state$is.lattice)
+	ylim <- unlogY(ylim, tmp.state$call, tmp.state$is.lattice)
 	print(list(x=signif(xlim, 3), y=signif(ylim, 3)))
 }
 showlims_button <- quote(quickTool("Limits", "gtk-yes",
 	tooltip="Print out current plot limits", f=showlims_handler))
-playwith(xyplot(Income ~ Population / Area, data=data.frame(state.x77)), 
+playwith(stripplot(Sepal.Length ~ Species, iris, jitter=T, factor=0.3),
 	extra.buttons=c(list("logscale", "zero"), showlims_button))
 
 ## A more complex toolbar item:
@@ -170,8 +192,8 @@ playwith(xyplot(Income ~ Population / Area, data=data.frame(state.x77)),
 ## Should work with plot or xyplot.
 my_cluster_handler <- function(widget, user.data) {
 	tmp.state <- plotAndPlayGetCurrState()
-	n <- widget[["value"]]
-	xy <- plotAndPlayGTK:::xy.coords.call(tmp.state$call, tmp.state$env)
+	n <- widget["value"]
+	xy <- xy.coords.call(tmp.state$call, tmp.state$env)
 	groups <- NULL
 	if (n > 1) {
 		clusts <- kmeans(cbind(xy$x,xy$y), n)
@@ -179,7 +201,7 @@ my_cluster_handler <- function(widget, user.data) {
 		groups <- factor(clusts$cluster, labels=labels)
 	}
 	# update state
-	# tmp.state$call$groups <- groups
+	#tmp.state$call$groups <- groups
 	# to avoid putting a big vector in the plot call, store in local env:
 	assign("auto_groups", groups, envir=tmp.state$env)
 	tmp.state$call$groups <- if (!is.null(groups)) quote(auto_groups)
@@ -188,7 +210,7 @@ my_cluster_handler <- function(widget, user.data) {
 }
 my_cluster_spinner <- quote({
 	spinner <- gtkSpinButton(min=1, max=10, step=1)
-	spinner[["value"]] <- 1
+	spinner["value"] <- 1
 	gSignalConnect(spinner, "value-changed", my_cluster_handler)
 	vbox <- gtkVBox()
 	vbox$packStart(gtkLabel("Clusters:"))

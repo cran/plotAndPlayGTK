@@ -4,41 +4,37 @@
 \alias{get.stem}
 \title{GTK file save dialog}
 \description{
-  ~~ A concise (1-5 lines) description of what the function does. ~~
+	Like \code{utils::choose.files} but to save a file rather than open one. 
 }
 \usage{
-choose.file.save(default = "", caption = "Save File", filters = Filters[c("All"), ], index = 0)
+choose.file.save(default = "", caption = "Save File", 
+                 filters = Filters[c("All"), ], index = 0)
 
 get.extension(path)
 get.stem(path)
 }
 \arguments{
-  \item{default}{ ~~Describe \code{default} here~~ }
-  \item{caption}{ ~~Describe \code{caption} here~~ }
-  \item{filters}{ ~~Describe \code{filters} here~~ }
-  \item{index}{ ~~Describe \code{index} here~~ }
-  \item{path}{ ~~Describe \code{path} here~~ }
+  \item{default}{ which filename to show initially. }
+  \item{caption}{ the caption on the file selection dialog. }
+  \item{filters}{ a matrix of filename filters (see \code{utils::choose.files}). }
+  \item{index}{ which row of filters to use by default. }
+  \item{path}{ file path (character). }
 }
 \details{
-  ~~ If necessary, more details than the description above ~~
+	\code{choose.file.save} is a wrapper around \code{\link[RGtk2]{gtkFileChooserDialog}}.
+	
+	\code{get.extension} returns the extension part of a filename;
+	\code{get.stem} returns the rest of the \code{\link{basename}}.
+	These were written by Graham Williams.
 }
 \value{
-  ~Describe the value returned
-  If it is a LIST, use
-  \item{comp1 }{Description of 'comp1'}
-  \item{comp2 }{Description of 'comp2'}
-  ...
+	\code{choose.file.save} returns the chosen file path, or \code{NA} if 'Cancel' was selected.
+	
+	\code{get.extension} and \code{get.stem} return character.
 }
-\references{ ~put references to the literature/web site here ~ }
-\author{ ~~who you are~~ }
-\note{ ~~further notes~~ 
-
-}
-\seealso{ ~~objects to See Also as \code{\link{help}}, ~~~ }
+\author{ Felix Andrews \email{felix@nfrac.org} }
+\seealso{  }
 \examples{
-##---- Should be DIRECTLY executable !! ----
-##-- ==>  Define data, use random,
-##--	or do  help(data=index)  for the standard data sets.
 
 }
 

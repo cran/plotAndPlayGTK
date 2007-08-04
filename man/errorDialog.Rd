@@ -4,7 +4,7 @@
 \alias{questionDialog}
 \title{Quick GTK message dialogs}
 \description{
-  ~~ A concise (1-5 lines) description of what the function does. ~~
+	Simple wrappers around \code{\link[RGtk2]{gtkMessageDialog}}.
 }
 \usage{
 errorDialog(..., isMarkup=F)
@@ -12,29 +12,19 @@ infoDialog(..., isMarkup=F)
 questionDialog(..., isMarkup=F)
 }
 \arguments{
-  \item{\dots}{ ~~Describe \code{\dots} here~~ }
-  \item{isMarkup}{ ~~Describe \code{isMarkup} here~~ }
+  \item{\dots}{ character object(s), pasted together with no separator. }
+  \item{isMarkup}{ whether to format embedded pango markup. }
 }
 \details{
-  ~~ If necessary, more details than the description above ~~
+  
 }
 \value{
-  ~Describe the value returned
-  If it is a LIST, use
-  \item{comp1 }{Description of 'comp1'}
-  \item{comp2 }{Description of 'comp2'}
-  ...
+	\code{questionDialog} returns either \code{"yes"} or \code{NULL}.
+	The others return \code{NULL}.
 }
-\references{ ~put references to the literature/web site here ~ }
-\author{ ~~who you are~~ }
-\note{ ~~further notes~~ 
-
-}
-\seealso{ ~~objects to See Also as \code{\link{help}}, ~~~ }
+\author{ Graham Williams }
+\seealso{  }
 \examples{
-##---- Should be DIRECTLY executable !! ----
-##-- ==>  Define data, use random,
-##--	or do  help(data=index)  for the standard data sets.
 
 }
 

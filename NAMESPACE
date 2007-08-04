@@ -3,6 +3,7 @@
 #import(cairoDevice)
 import(lattice)
 import(grid)
+import(grDevices)
 
 # the main function
 export(
@@ -25,7 +26,12 @@ export(
 	plotAndPlayUnmakePrompt,
 	plotAndPlaySetPrompt,
 	plotAndPlayGetToolbar,
-	plotAndPlayGetDA
+	plotAndPlayGetDA,
+	plotAndPlaySetRawXLim,
+	plotAndPlaySetRawYLim,
+	unlogX,
+	unlogY,
+	xy.coords.call
 )
 
 # other GTK GUI stuff

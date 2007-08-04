@@ -1,44 +1,50 @@
 \name{guiDo}
 \alias{guiDo}
-\title{Execute a command, log it, show error dialog on failure}
+\title{Wrapper for running commands from a GUI}
 \description{
-  ~~ A concise (1-5 lines) description of what the function does. ~~
+  Execute a command, log it, and show error dialog on failure.
 }
 \usage{
 guiDo(expr, call, doLog = T, doFailureLog = doLog, logFunction = addToLog, 
-      doFailureDialog = T, doStop = T, envir = if (doLog) .GlobalEnv else parent.frame() )
+      doFailureDialog = T, doStop = T, envir = if (doLog) .GlobalEnv else parent.frame(),
+      ...)
 }
 \arguments{
-  \item{expr}{ ~~Describe \code{expr} here~~ }
-  \item{call}{ ~~Describe \code{call} here~~ }
-  \item{doLog}{ ~~Describe \code{doLog} here~~ }
-  \item{doFailureLog}{ ~~Describe \code{doFailureLog} here~~ }
-  \item{logFunction}{ ~~Describe \code{logFunction} here~~ }
-  \item{doFailureDialog}{ ~~Describe \code{doFailureDialog} here~~ }
-  \item{doStop}{ ~~Describe \code{doStop} here~~ }
-  \item{envir}{ ~~Describe \code{envir} here~~ }
+  \item{expr}{ an expression to run (\code{\link{eval}}), or a string to parse and run.
+  To run multiple commands, wrap them in \{braces\}.}
+  \item{call}{ a \code{\link{call}} object, if given this is used instead of \code{expr}. }
+  \item{doLog}{ whether to write the command to a log: see \code{logFunction}. }
+  \item{doFailureLog}{ whether to log \code{"# FAILED"} if an error occurs. }
+  \item{logFunction}{ a function to write text to the log, passed as the first argument. 
+  If the default \code{addToLog} is not defined then \code{function(x) cat(x,"\n")} is used.}
+  \item{doFailureDialog}{ Whether to show a dialog box if an error occurs. }
+  \item{doStop}{ Whether to stop execution if an error occurs.
+  If false, the function can return an object of class \code{error}: see \code{\link{tryCatch}}.}
+  \item{envir}{ \code{\link{environment}} to evaluate the command in. }
+  \item{\dots}{ further arguments passed to \code{\link{deparse}}. }
 }
 \details{
-  ~~ If necessary, more details than the description above ~~
+  This is for use in a GUI based on RGtk2. It runs the given command 
+  (which can be given as a literal expression, a string to parse, or a call object)
+  in the specified environment, writes the command to a log, and shows an error dialog on failure.
+  The error dialog contains the given call, the frame where the error occurred, the error message,
+  and a suggestion to send in a bug report.
 }
 \value{
-  ~Describe the value returned
-  If it is a LIST, use
-  \item{comp1 }{Description of 'comp1'}
-  \item{comp2 }{Description of 'comp2'}
-  ...
+	\code{guiDo} returns the result of the given call, or an object of class \code{error}
+	if there was an error and \code{doStop=F}.
 }
-\references{ ~put references to the literature/web site here ~ }
-\author{ ~~who you are~~ }
-\note{ ~~further notes~~ 
-
-}
-\seealso{ ~~objects to See Also as \code{\link{help}}, ~~~ }
+\author{ Felix Andrews \email{felix@nfrac.org} }
 \examples{
-##---- Should be DIRECTLY executable !! ----
-##-- ==>  Define data, use random,
-##--	or do  help(data=index)  for the standard data sets.
+\dontrun{
 
+x <- "hello"
+guiDo(y <- paste(x, "world"))
+
+# error dialog:
+guiDo( print(paste(y + 1, "is not a number")) )
+
+}
 }
 
 \keyword{ error }

@@ -5,7 +5,7 @@
 \alias{setTextviewMonospace}
 \title{Convenience functions for gtkTextView}
 \description{
-  ~~ A concise (1-5 lines) description of what the function does. ~~
+  Convenience functions for \code{\link[RGtk2]{gtkTextView}}.
 }
 \usage{
 setTextview(tv, ..., sep = "")
@@ -14,31 +14,20 @@ getTextviewText(tv)
 setTextviewMonospace(tv)
 }
 \arguments{
-  \item{tv}{ ~~Describe \code{tv} here~~ }
-  \item{\dots}{ ~~Describe \code{\dots} here~~ }
-  \item{sep}{ ~~Describe \code{sep} here~~ }
+  \item{tv}{ a \code{\link[RGtk2]{gtkTextView}}. }
+  \item{\dots}{ character objects, passed to \code{\link{paste}}. }
+  \item{sep}{ passed to \code{\link{paste}}. }
 }
 \details{
-  ~~ If necessary, more details than the description above ~~
+  
 }
 \value{
-  ~Describe the value returned
-  If it is a LIST, use
-  \item{comp1 }{Description of 'comp1'}
-  \item{comp2 }{Description of 'comp2'}
-  ...
+	\code{getTextviewText} returns the text from the given text box.
 }
-\references{ ~put references to the literature/web site here ~ }
-\author{ ~~who you are~~ }
-\note{ ~~further notes~~ 
-
-}
-\seealso{ ~~objects to See Also as \code{\link{help}}, ~~~ }
+\author{ Graham Williams }
+\seealso{  }
 \examples{
-##---- Should be DIRECTLY executable !! ----
-##-- ==>  Define data, use random,
-##--	or do  help(data=index)  for the standard data sets.
-
+	
 }
 
 \keyword{ utilities }

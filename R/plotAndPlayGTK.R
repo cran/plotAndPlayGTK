@@ -6,7 +6,7 @@
 
 MAJOR <- "0"
 MINOR <- "8"
-REVISION <- unlist(strsplit("$Revision: 46 $", split=" "))[2]
+REVISION <- unlist(strsplit("$Revision: 51 $", split=" "))[2]
 VERSION <- paste(MAJOR, MINOR, REVISION, sep=".")
 COPYRIGHT <- paste("(c) 2007 Felix Andrews <felix@nfrac.org>",
 	"with contributions from Deepayan Sarkar and Graham Williams")
@@ -67,8 +67,8 @@ plotAndPlayBasicButtons <- alist(
 
 quickTool <- function(label, icon.name=NULL, tooltip=NULL, f, data=NULL, isToggle=F) {
 	x <- if (isToggle) gtkToggleToolButton() else gtkToolButton()
-	x[["label"]] <- label
-	x[["icon-name"]] <- icon.name
+	x["label"] <- label
+	x["icon-name"] <- icon.name
 	if (!is.null(tooltip)) {
 		thisTips <- gtkTooltips()
 		thisTips$setTip(x, tooltip)
@@ -120,8 +120,6 @@ makeSaveMenuButton <- function() {
 }
 
 # look at rpanel and tkwidgets and GeoXP and iplots etc
-
-# get labels from formula rownames
 
 # superpose button:
 # off = ~ data | which
@@ -192,10 +190,32 @@ playwith <- function(expr, name="plot", nav.scales=c("x","y"), trans.scales=c("y
 				identify.call <- call('panel.identify.qqmath')
 			# try to guess labels
 			if (is.null(labels)) {
+				tmp.data <- NULL
 				if ('data' %in% names(plot.call)) {
-					labels <- row.names(eval(plot.call$data, env))
+					tmp.data <- eval(plot.call$data, env)
+					labels <- row.names(tmp.data)
 				}
-				# TODO: try to get row names from formula
+				if (is.null(labels)) {
+					# try to get labels from formula
+					tmp.x <- eval(plot.call$x, env)
+					if (inherits(tmp.x, "formula")) {
+						xObj <- if (length(tmp.x) == 2)
+							tmp.x[[2]] else tmp.x[[3]]
+						while (is.call(xObj) && as.character(xObj[[1]]) %in% 
+							c("|", "*", "+"))
+							xObj <- xObj[[2]]
+						xObj <- eval(xObj, tmp.data, environment(tmp.x))
+						labels <- row.names(xObj)
+						if (inherits(xObj, "POSIXt"))
+							labels <- format(xObj)
+						if (inherits(xObj, "Date"))
+							labels <- format(xObj)
+						
+					} else if (is.ts(tmp.x) ||
+						inherits(tmp.x, "zoo")) {
+						labels <- rep(format(stats::time(tmp.x)), NCOL(tmp.x))
+					}
+				}
 			}
 			if (!is.null(labels)) identify.call$labels <- labels
 		} else {
@@ -208,11 +228,21 @@ playwith <- function(expr, name="plot", nav.scales=c("x","y"), trans.scales=c("y
 			if (is.null(labels)) {
 				if ('x' %in% names(plot.call)) {
 					tmp.x <- eval(plot.call$x, env)
-					labels <- row.names(tmp.x)
-					if (is.null(labels)) {
-						if (is.ts(tmp.x)) {
-							labels <- time(tmp.x)
-						}
+					if (inherits(tmp.x, "formula")) {
+						xObj <- if (length(tmp.x) == 2)
+							tmp.x[[2]] else tmp.x[[3]]
+						xObj <- eval(xObj, environment(tmp.x), env)
+						labels <- row.names(xObj)
+						if (inherits(xObj, "POSIXt"))
+							labels <- format(xObj)
+						if (inherits(xObj, "Date"))
+							labels <- format(xObj)
+						
+					} else if (inherits(tmp.x, "ts") ||
+						inherits(tmp.x, "zoo")) {
+						labels <- format(stats::time(tmp.x))
+					} else {
+						labels <- row.names(tmp.x)
 					}
 				}
 			}
@@ -232,9 +262,9 @@ playwith <- function(expr, name="plot", nav.scales=c("x","y"), trans.scales=c("y
 			"Make sure you have recent versions of",
 			"RGtk2 and the GTK+ libraries.",
 			"See http://www.ggobi.org/rgtk2/"))
-		myWin[["default-width"]] <- 640
-		myWin[["default-height"]] <- 480
-		myWin[["title"]] <- paste("plotAndPlay:", name)
+		myWin["default-width"] <- 640
+		myWin["default-height"] <- 480
+		myWin["title"] <- paste("plotAndPlay:", name)
 		gSignalConnect(myWin, "delete-event", .plotAndPlay_close_event, 
 			data=list(name=name))
 		myWin$show()
@@ -328,6 +358,7 @@ playwith <- function(expr, name="plot", nav.scales=c("x","y"), trans.scales=c("y
 		trans.scales=trans.scales,
 		ids=list(),
 		brushed=list(),
+		annotations=list(),
 		is.lattice=is.lattice,
 		focus=list(col=0, row=0),
 		page=1,
@@ -471,12 +502,12 @@ playwith <- function(expr, name="plot", nav.scales=c("x","y"), trans.scales=c("y
 	if (!nav.y) highEdge <- "right edge"
 	if (!nav.x) highEdge <- "top edge"
 	# set up masking
-	maskGrob <- rectGrob(gp=gpar(col="grey", 
+	maskGrob <- rectGrob(gp=gpar(col="red", 
 		fill=rgb(0.5,0.5,0.5, alpha=0.25)), name="tmp.mask")
 	# get new scales interactively
 	if (StateEnv[[name]]$is.lattice) {
 		# lattice plot
-		newFocus <- plotAndPlayDoFocus()
+		newFocus <- plotAndPlayDoFocus(clip.off=T)
 		if (!any(newFocus)) return()
 		plotAndPlaySetPrompt(paste("Zooming to selected region...",
 			"click at the", lowEdge))
@@ -520,28 +551,6 @@ playwith <- function(expr, name="plot", nav.scales=c("x","y"), trans.scales=c("y
 			x=unit(xlim.new[2],"native"), 
 			width=unit(xlim.new[2] - xlim.new[1],"native"),
 			just=c("right", "top")))
-		# convert back from log scale if required
-		newlims <- latticeUnLog(xlim.new, ylim.new, 
-			StateEnv[[name]]$call$scales)
-		# convert new scale to factor levels if required
-		if (nav.x && is.factor(datax <- trellis.panelArgs()$x)) {
-			if (is.null(StateEnv[[name]]$call$scales$x$labels)) {
-				StateEnv[[name]]$call$scales$x$labels <- levels(datax)
-				StateEnv[[name]]$call$scales$x$at <- 1:nlevels(datax)
-			}
-			#newlims$x <- levels(datax)[
-			#	seq(ceiling(min(newlims$x)), max(newlims$x))]
-		}
-		if (nav.y && is.factor(datay <- trellis.panelArgs()$y)) {
-			if (is.null(StateEnv[[name]]$call$scales$y$labels)) {
-				StateEnv[[name]]$call$scales$y$labels <- levels(datay)
-				StateEnv[[name]]$call$scales$y$at <- 1:nlevels(datay)
-			}
-			#newlims$y <- levels(trellis.panelArgs()$y)[
-			#	seq(ceiling(min(newlims$y)), max(newlims$y))]
-		}
-		if (nav.x) StateEnv[[name]]$call$xlim <- newlims$x
-		if (nav.y) StateEnv[[name]]$call$ylim <- newlims$y
 	} else {
 		# traditional graphics plot
 		plotAndPlaySetPrompt(paste("Zooming to selected region...",
@@ -565,12 +574,10 @@ playwith <- function(expr, name="plot", nav.scales=c("x","y"), trans.scales=c("y
 		ylim.new[2] <- if (nav.y) clickLoc$y else ylim[2]
 		if (nav.x) abline(v=xlim.new[2], col="red")
 		if (nav.y) abline(h=ylim.new[2], col="red")
-		# convert back from log scale if required
-		if (par("xlog")) xlim <- 10 ^ xlim
-		if (par("ylog")) ylim <- 10 ^ ylim
-		if (nav.x) StateEnv[[name]]$call$xlim <- xlim.new
-		if (nav.y) StateEnv[[name]]$call$ylim <- ylim.new
 	}
+	# this converts from raw numeric to original format (including unlog)
+	if (nav.x) plotAndPlaySetRawXLim(xlim.new)
+	if (nav.y) plotAndPlaySetRawYLim(ylim.new)
 	plotAndPlayUpdate()
 }
 
@@ -581,34 +588,24 @@ playwith <- function(expr, name="plot", nav.scales=c("x","y"), trans.scales=c("y
 	# disable other plot buttons until this is over
 	plotAndPlayGetToolbar()$setSensitive(F)
 	on.exit(plotAndPlayGetToolbar()$setSensitive(T))
-	# find existing scales and update call
+	# find existing scales
 	if (StateEnv[[name]]$is.lattice) {
-		# lattice plot
 		if (!any(StateEnv[[name]]$focus)) {
 			trellis.focus("panel", 1, 1, highlight=F)
 		}
 		xlim <- convertX(unit(0:1, "npc"), "native", valueOnly=T)
 		ylim <- convertY(unit(0:1, "npc"), "native", valueOnly=T)
-		# zoom out: make range twice the size
-		if (nav.x) xlim <- xlim + diff(xlim) * c(-0.5, 0.5)
-		if (nav.y) ylim <- ylim + diff(ylim) * c(-0.5, 0.5)
-		# convert back from log scale if required
-		newlims <- latticeUnLog(xlim, ylim, StateEnv[[name]]$call$scales)
-		if (nav.x) StateEnv[[name]]$call$xlim <- newlims$x
-		if (nav.y) StateEnv[[name]]$call$ylim <- newlims$y
 	} else {
 		# traditional graphics plot
 		xlim <- par("usr")[1:2]
 		ylim <- par("usr")[3:4]
-		# zoom out: make range twice the size
-		if (nav.x) xlim <- xlim + diff(xlim) * c(-0.5, 0.5)
-		if (nav.y) ylim <- ylim + diff(ylim) * c(-0.5, 0.5)
-		# convert back from log scale if required
-		if (par("xlog")) xlim <- 10 ^ xlim
-		if (par("ylog")) ylim <- 10 ^ ylim
-		if (nav.x) StateEnv[[name]]$call$xlim <- xlim
-		if (nav.y) StateEnv[[name]]$call$ylim <- ylim
 	}
+	# zoom out: make range twice the size
+	if (nav.x) xlim <- xlim + diff(xlim) * c(-0.5, 0.5)
+	if (nav.y) ylim <- ylim + diff(ylim) * c(-0.5, 0.5)
+	# this converts from raw numeric to original format (including unlog)
+	if (nav.x) plotAndPlaySetRawXLim(xlim)
+	if (nav.y) plotAndPlaySetRawYLim(ylim)
 	plotAndPlayUpdate()
 }
 
@@ -619,16 +616,9 @@ playwith <- function(expr, name="plot", nav.scales=c("x","y"), trans.scales=c("y
 	# disable other plot buttons until this is over
 	plotAndPlayGetToolbar()$setSensitive(F)
 	on.exit(plotAndPlayGetToolbar()$setSensitive(T))
-	# find existing scales and update call
-	if (StateEnv[[name]]$is.lattice) {
-		# lattice plot
-		if (nav.x) StateEnv[[name]]$call$xlim <- NULL
-		if (nav.y) StateEnv[[name]]$call$ylim <- NULL
-	} else {
-		# traditional graphics plot
-		if (nav.x) StateEnv[[name]]$call$xlim <- NULL
-		if (nav.y) StateEnv[[name]]$call$ylim <- NULL
-	}
+	# update scales
+	if (nav.x) StateEnv[[name]]$call$xlim <- NULL
+	if (nav.y) StateEnv[[name]]$call$ylim <- NULL
 	plotAndPlayUpdate()
 }
 
@@ -644,7 +634,6 @@ playwith <- function(expr, name="plot", nav.scales=c("x","y"), trans.scales=c("y
 	on.exit(plotAndPlayUnmakePrompt(), add=T)
 	# get new scales interactively
 	if (StateEnv[[name]]$is.lattice) {
-		# lattice plot
 		newFocus <- plotAndPlayDoFocus()
 		if (!any(newFocus)) return()
 		plotAndPlaySetPrompt("Click to re-centre the plot")
@@ -657,25 +646,6 @@ playwith <- function(expr, name="plot", nav.scales=c("x","y"), trans.scales=c("y
 			return()
 		}
 		clickLoc <- lapply(clickLoc, as.numeric)
-		if (nav.x) xlim <- clickLoc$x + diff(xlim) * c(-0.5, 0.5)
-		if (nav.y) ylim <- clickLoc$y + diff(ylim) * c(-0.5, 0.5)
-		# convert back from log scale if required
-		newlims <- latticeUnLog(xlim, ylim, StateEnv[[name]]$call$scales)
-		# label factor levels if required
-		if (nav.x && is.factor(datax <- trellis.panelArgs()$x)) {
-			if (is.null(StateEnv[[name]]$call$scales$x$labels)) {
-				StateEnv[[name]]$call$scales$x$labels <- levels(datax)
-				StateEnv[[name]]$call$scales$x$at <- 1:nlevels(datax)
-			}
-		}
-		if (nav.y && is.factor(datay <- trellis.panelArgs()$y)) {
-			if (is.null(StateEnv[[name]]$call$scales$y$labels)) {
-				StateEnv[[name]]$call$scales$y$labels <- levels(datay)
-				StateEnv[[name]]$call$scales$y$at <- 1:nlevels(datay)
-			}
-		}
-		if (nav.x) StateEnv[[name]]$call$xlim <- newlims$x
-		if (nav.y) StateEnv[[name]]$call$ylim <- newlims$y
 	} else {
 		# traditional graphics plot
 		plotAndPlaySetPrompt("Click to re-centre the plot")
@@ -686,14 +656,12 @@ playwith <- function(expr, name="plot", nav.scales=c("x","y"), trans.scales=c("y
 		if (is.null(clickLoc)) {
 			return()
 		}
-		if (nav.x) xlim <- clickLoc$x + diff(xlim) * c(-0.5, 0.5)
-		if (nav.y) ylim <- clickLoc$y + diff(ylim) * c(-0.5, 0.5)
-		# convert back from log scale if required
-		if (par("xlog")) xlim <- 10 ^ xlim
-		if (par("ylog")) ylim <- 10 ^ ylim
-		if (nav.x) StateEnv[[name]]$call$xlim <- xlim
-		if (nav.y) StateEnv[[name]]$call$ylim <- ylim
 	}
+	if (nav.x) xlim <- clickLoc$x + diff(xlim) * c(-0.5, 0.5)
+	if (nav.y) ylim <- clickLoc$y + diff(ylim) * c(-0.5, 0.5)
+	# this converts from raw numeric to original format (including unlog)
+	if (nav.x) plotAndPlaySetRawXLim(xlim)
+	if (nav.y) plotAndPlaySetRawYLim(ylim)
 	plotAndPlayUpdate()
 }
 
@@ -821,19 +789,18 @@ playwith <- function(expr, name="plot", nav.scales=c("x","y"), trans.scales=c("y
 		# draw upper bounds
 		if (nav.x) panel.abline(v=xlim.new[2])
 		if (nav.y) panel.abline(h=ylim.new[2])
-		# convert back from log scale if required
-		newlims <- latticeUnLog(xlim.new, ylim.new, 
-			StateEnv[[name]]$call$scales)
+		xlim <- unlogX(xlim.new, StateEnv[[name]]$call)
+		ylim <- unlogY(ylim.new, StateEnv[[name]]$call)
 		# set identified points
-		idCall <- StateEnv[[name]]$id.call
-		if ('x' %in% names(idCall)) {
+		if ('x' %in% names(idCall <- StateEnv[[name]]$id.call)) {
 			xy <- xy.coords.call(idCall, StateEnv[[name]]$env)
 			subscripts <- seq_along(xy$x)
 		} else {
 			pargs <- trellis.panelArgs()
 			xy <- xy.coords(pargs, recycle=T)
 			# convert back from log scale if required
-			xy <- latticeUnLog(xy$x, xy$y, StateEnv[[name]]$call$scales)
+			xy$x <- unlogX(xy$x, StateEnv[[name]]$call)
+			xy$y <- unlogY(xy$y, StateEnv[[name]]$call)
 			subscripts <- pargs$subscripts
 		}
 		ids.new <- which(
@@ -867,10 +834,9 @@ playwith <- function(expr, name="plot", nav.scales=c("x","y"), trans.scales=c("y
 		ylim.new[2] <- if (nav.y) clickLoc$y else ylim[2]
 		if (nav.x) abline(v=xlim.new[2], col="red")
 		if (nav.y) abline(h=ylim.new[2], col="red")
-		# convert back from log scale if required
-		if (par("xlog")) xlim.new <- 10 ^ xlim.new
-		if (par("ylog")) ylim.new <- 10 ^ ylim.new
-		xy <- xy.coords.call(StateEnv[[name]]$call, StateEnv[[name]]$env)
+		xlim <- unlogX(xlim.new, StateEnv[[name]]$call, is.lattice=F)
+		ylim <- unlogY(ylim.new, StateEnv[[name]]$call, is.lattice=F)
+		xy <- xy.coords.call(StateEnv[[name]]$id.call, StateEnv[[name]]$env)
 		ids.new <- which(
 			(min(xlim.new) < xy$x) & (xy$x < max(xlim.new)) &
 			(min(ylim.new) < xy$y) & (xy$y < max(ylim.new))
@@ -1199,13 +1165,13 @@ playwith <- function(expr, name="plot", nav.scales=c("x","y"), trans.scales=c("y
 
 .plotAndPlay_flyup3d_event <- function(widget, user.data) {
 	name <- StateEnv$.current
-	StateEnv[[name]]$call$screen <- c(z=45, StateEnv[[name]]$call$screen)
+	StateEnv[[name]]$call$screen <- c(x=15, y=15, StateEnv[[name]]$call$screen)
 	plotAndPlayUpdate()
 }
 
 .plotAndPlay_flydown3d_event <- function(widget, user.data) {
 	name <- StateEnv$.current
-	StateEnv[[name]]$call$screen <- c(z=45, StateEnv[[name]]$call$screen)
+	StateEnv[[name]]$call$screen <- c(x=-15, y=-15, StateEnv[[name]]$call$screen)
 	plotAndPlayUpdate()
 }
 
@@ -1256,8 +1222,23 @@ plotAndPlayUpdate <- function() {
 		# plot trellis object
 		curPage <- StateEnv[[name]]$page
 		print(result, packet.panel=packet.panel.page(curPage))
-		# draw persistent labels
 		packets <- trellis.currentLayout(which="packet")
+		# draw persistent brushing
+		for (myPacket in names(StateEnv[[name]]$brushed)) {
+			whichOne <- which(packets == as.numeric(myPacket))
+			if (length(whichOne) == 0) next
+			myCol <- col(packets)[whichOne]
+			myRow <- row(packets)[whichOne]
+			trellis.focus("panel", myCol, myRow, highlight=F)
+			# find which points are identified
+			pargs <- trellis.panelArgs()
+			ids <- StateEnv[[name]]$brushed[[myPacket]]
+			# next line same as: which(pargs$subscripts %in% ids)
+			ids.sub <- findInterval(ids, pargs$subscripts)
+			splom.drawBrushed(ids.sub)
+			trellis.unfocus()
+		}
+		# draw persistent labels
 		for (myPacket in names(StateEnv[[name]]$ids)) {
 			whichOne <- which(packets == as.numeric(myPacket))
 			if (length(whichOne) == 0) next
@@ -1290,19 +1271,22 @@ plotAndPlayUpdate <- function() {
 			}
 			trellis.unfocus()
 		}
-		# draw persistent brushing
-		for (myPacket in names(StateEnv[[name]]$brushed)) {
+		# draw annotations
+		for (myPacket in names(StateEnv[[name]]$annotations)) {
+			if (myPacket == "toplevel") {
+				for (expr in StateEnv[[name]]$annotations[[myPacket]]) {
+					eval(expr, StateEnv[[name]]$env)
+				}
+				next
+			}
 			whichOne <- which(packets == as.numeric(myPacket))
 			if (length(whichOne) == 0) next
 			myCol <- col(packets)[whichOne]
 			myRow <- row(packets)[whichOne]
 			trellis.focus("panel", myCol, myRow, highlight=F)
-			# find which points are identified
-			pargs <- trellis.panelArgs()
-			ids <- StateEnv[[name]]$brushed[[myPacket]]
-			# next line same as: which(pargs$subscripts %in% ids)
-			ids.sub <- findInterval(ids, pargs$subscripts)
-			splom.drawBrushed(ids.sub)
+			for (expr in StateEnv[[name]]$annotations[[myPacket]]) {
+				eval(expr, StateEnv[[name]]$env)
+			}
 			trellis.unfocus()
 		}
 		# set focus
@@ -1323,6 +1307,10 @@ plotAndPlayUpdate <- function() {
 				do.call(text, c(list(xy$x[ids], xy$y[ids], 
 					labels=labels[ids], pos=1), label.args))
 			}
+		}
+		# draw annotations
+		for (expr in StateEnv[[name]]$annotations$all) {
+			eval(expr, StateEnv[[name]]$env)
 		}
 	}
 	invisible(result)
@@ -1375,24 +1363,78 @@ plotAndPlaySetPrompt <- function(text) {
 	myLabel$setMarkup(paste(sep='','<big><b>', text, '</b></big>'))
 }
 
-latticeUnLog <- function(x, y, scalesArg) {
-	# x scale
-	if (!is.null(scalesArg$x$log)) {
-		logBase <- latticeLogBase(scalesArg$x$log)
-		if (!is.null(logBase)) x <- logBase ^ x
-	} else {
-		logBase <- latticeLogBase(scalesArg$log)
-		if (!is.null(logBase)) x <- logBase ^ x
+plotAndPlaySetRawXLim <- function(x) {
+	plotAndPlaySetRawLim(x, "x")
+}
+
+plotAndPlaySetRawYLim <- function(x) {
+	plotAndPlaySetRawLim(x, "y")
+}
+
+plotAndPlaySetRawLim <- function(x, x.or.y=c("x", "y")) {
+	name <- StateEnv$.current
+	x.or.y <- match.arg(x.or.y)
+	# convert back from log scale if required
+	x <- unlogXY(x, StateEnv[[name]]$call, StateEnv[[name]]$is.lattice, x.or.y=x.or.y)
+	if (StateEnv[[name]]$is.lattice) {
+		x.panel <- trellis.panelArgs()[[x.or.y]]
+		# convert new scale to appropriate date time class if required
+		if (inherits(x.panel, "Date") || inherits(x.panel, "POSIXt")) {
+			mostattributes(x) <- attributes(x.panel)
+		}
+		# TODO: class "dates", "times"? do they come through to panelArgs?
+		
+		# convert new scale to factor levels if required
+		if (is.factor(x.panel)) {
+			#offset <- 0
+			#limTerm <- the.call[[paste(x.or.y, "lim", sep="")]]
+			#if (is.character(sublevels <- try(eval(limTerm)))) {
+			#	offset <- 1 - match(sublevels[1], levels(x.panel))
+			#}
+			#newlevels.i <- pmax(0, -offset + seq(ceiling(min(x)), max(x)))
+			#x <- levels(x.panel)[newlevels.i]
+			if (is.null(StateEnv[[name]]$call$scales[[x.or.y]]$labels)) {
+				StateEnv[[name]]$call$scales[[x.or.y]]$labels <- levels(x.panel)
+				StateEnv[[name]]$call$scales[[x.or.y]]$at <- 1:nlevels(x.panel)
+			}
+		}
 	}
-	# y scale
-	if (!is.null(scalesArg$y$log)) {
-		logBase <- latticeLogBase(scalesArg$y$log)
-		if (!is.null(logBase)) y <- logBase ^ y
+	if (x.or.y == "x") StateEnv[[name]]$call$xlim <- x
+	if (x.or.y == "y") StateEnv[[name]]$call$ylim <- x
+}
+
+untransformXlim <- function(x, the.call, is.lattice=T) {
+	untransformXYlim(x, the.call, is.lattice, x.or.y="x")
+}
+
+untransformYlim <- function(x, the.call, is.lattice=T) {
+	untransformXYlim(x, the.call, is.lattice, x.or.y="y")
+}
+
+unlogXY <- function(x, the.call, is.lattice=T, x.or.y=c("x", "y")) {
+	x.or.y <- match.arg(x.or.y)
+	scalesArg <- the.call$scales
+	if (is.lattice) {
+		if (!is.null(scalesArg[[x.or.y]]$log)) {
+			logBase <- latticeLogBase(scalesArg[[x.or.y]]$log)
+			if (!is.null(logBase)) x <- logBase ^ x
+		} else {
+			logBase <- latticeLogBase(scalesArg$log)
+			if (!is.null(logBase)) x <- logBase ^ x
+		}
 	} else {
-		logBase <- latticeLogBase(scalesArg$log)
-		if (!is.null(logBase)) y <- logBase ^ y
+		# traditional graphics plot
+		if (par(paste(x.or.y, "log", sep=""))) x <- 10 ^ x
 	}
-	return(list(x=x, y=y))
+	x
+}
+
+unlogX <- function(x, the.call, is.lattice=T) {
+	unlogXY(x, the.call, is.lattice, x.or.y="x")
+}
+
+unlogY <- function(x, the.call, is.lattice=T) {
+	unlogXY(x, the.call, is.lattice, x.or.y="y")
 }
 
 latticeLogBase <- function(x) {
@@ -1407,9 +1449,10 @@ xy.coords.call <- function(the.call, envir=parent.frame(), log=NULL, recycle=TRU
 	stopifnot(is.call(the.call))
 	# put call into canonical form
 	the.call <- match.call(eval(the.call[[1]], envir=envir), the.call)
-	xy.coords(eval(the.call$x, envir),
-		if ('y' %in% names(the.call)) eval(the.call$y, envir),
-		log=log, recycle=recycle)
+	tmp.x <- eval(the.call$x, envir)
+	tmp.y <- if ('y' %in% names(the.call)) eval(the.call$y, envir)
+	#if (inherits(tmp.x, "zoo")) return(xy.coords(zoo::index(x), x[,1], log=log, recycle=recycle))
+	xy.coords(tmp.x, tmp.y, log=log, recycle=recycle)
 }
 
 substitute.call <- function(the.call, ...) 
