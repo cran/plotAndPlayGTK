@@ -7,15 +7,16 @@
 }
 \usage{
 playwith(expr, name = "plot", nav.scales = c("x","y"), trans.scales = c("y"), 
-	 buttons = list("identify", "zoomin", "zoomout", "zoomfit", "centre"), 
+	 buttons = list("annotate", "identify", "zoom", "centre"), 
 	 extra.buttons = list("zero"), basic.buttons=plotAndPlayBasicButtons, 
-	 labels = NULL, label.args = list(cex = 0.7), identify.call = NULL, 
+	 labels = NULL, label.args = list(cex = 1), identify.call = NULL, 
 	 plot.call, is.lattice = (callName \%in\% latticeNames), eval.args = NA, 
 	 invert.match = F, envir = parent.frame(), restore.on.close = NULL)
 }
 \arguments{
   \item{expr}{ an expression to create a plot, like \code{plot(mydata)}. 
-  	Note, this can have lots of arguments, just like a normal plot call (see examples). }
+  	Note, this can have lots of arguments, just like a normal plot call (see examples).
+  	Can also be a chunk of code in \code{\{braces\}}, but that form does not allow interaction. }
   \item{name}{ character value to identify the plot window. }
   \item{nav.scales}{ one or more of \code{c("x","y")} defining which scale(s) to navigate along (e.g. zoom in). }
   \item{trans.scales}{ one or more of \code{c("x","y")} defining which scale(s) to transform (e.g. log). }
@@ -89,17 +90,19 @@ playwith(expr, name = "plot", nav.scales = c("x","y"), trans.scales = c("y"),
 \examples{
 \dontrun{
 
+## `playwith` a base graphics plot: interaction and annotation
 ## from example(plot.default)
-playwith(plot(cars$speed, cars$dist, xlab="Speed", ylab="Distance",
-     panel.first = lines(lowess(cars$speed, cars$dist), lty = "dashed"),
-     pch = 0, cex = 1.2, col = "blue"))
+playwith(plot(cars$speed, cars$dist, xlab = "Speed", ylab = "Distance",
+         panel.first = lines(lowess(cars$speed, cars$dist), lty = "dashed"),
+         pch = 0, cex = 1.2, col = "blue"))
 
 require(lattice)
 
+## multiple lattice panels; identify points with nice labels
 playwith(xyplot(Income ~ Population / Area | state.region, 
 	data=data.frame(state.x77)))
 
-## same plot with two panels per page
+## same plot with 2 pages (2 panels per page)
 playwith(xyplot(Income ~ Population / Area | state.region, 
 	data=data.frame(state.x77), layout=c(2,1)), name="other")
 
@@ -110,9 +113,9 @@ playwith(plot(treering2), nav.scales="x", trans.scales="y",
 	extra.buttons=list("logscale"))
 
 ## see what the current call is (for last focused plot window)
-str(as.list(plotAndPlayGetCurrState()$call))
+plotAndPlayGetCurrState()$call
 
-## example of evaluating plot arguments
+## example of evaluating and storing arguments in the plot call
 globalOne <- 1:10
 localStuff <- function() {
 	localOne <- 10:1
@@ -122,11 +125,28 @@ localStuff()
 ## see which objects have been copied and stored with the plot
 sapply(plotAndPlayGetCurrState()$env, object.size)
 
-## simple brushing is possible, based on lattice::panel.brush.splom
+## brushing multivariate scatterplots, see help(panel.brush.splom)
 playwith(splom(environmental))
 
 ## simple spin and zoom for 3D plots
-playwith(wireframe(volcano))
+playwith(wireframe(volcano, drape=TRUE))
+
+## a code chunk: no interaction, only annotation, save to file, etc
+## from example(plot.default)
+x <- 0:12
+y <- sin(pi/5 * x)
+playwith({
+   op <- par(mfrow = c(3,3), mar = .1+ c(2,2,3,1))
+   for (tp in c("p","l","b",  "c","o","h",  "s","S","n")) {
+      plot(y ~ x, type = tp,
+   	main = paste("plot(*, type = \"",tp,"\")",sep=""))
+      if(tp == "S") {
+         lines(x,y, type = "s", col = "red", lty = 2)
+         mtext("lines(*, type = \"s\", ...)", col = "red", cex=.8)
+      }
+   }
+   par(op)
+})
 
 ## see help(plotAndPlayButtons) for examples of defining new buttons!
 

@@ -2,6 +2,7 @@
 \alias{.plotAndPlay_close_event}
 \alias{.plotAndPlay_save_event}
 \alias{.plotAndPlay_copy_event}
+\alias{.plotAndPlay_print_event}
 \alias{.plotAndPlay_greyscale_event}
 \alias{.plotAndPlay_zoomin_event}
 \alias{.plotAndPlay_zoomout_event}
@@ -19,6 +20,8 @@
 \alias{.plotAndPlay_brush_region_event}
 \alias{.plotAndPlay_brush_drag_event}
 \alias{.plotAndPlay_clear_event}
+\alias{.plotAndPlay_annotate_event}
+\alias{.plotAndPlay_edit_in_place_event}
 \alias{.plotAndPlay_edit_event}
 \alias{.plotAndPlay_zoomin3d_event}
 \alias{.plotAndPlay_zoomout3d_event}

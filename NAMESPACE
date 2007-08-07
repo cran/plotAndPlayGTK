@@ -4,6 +4,7 @@
 import(lattice)
 import(grid)
 import(grDevices)
+import(graphics)
 
 # the main function
 export(

@@ -9,14 +9,14 @@
 
 # generally useful RGtk2 GUI things
 
-guiDo <- function(expr, call, doLog=T, doFailureLog=doLog, 
+guiDo <- function(expr, call, string, doLog=T, doFailureLog=doLog, 
 	logFunction=addToLog, doFailureDialog=T, doStop=T, 
 	envir=if (doLog) .GlobalEnv else parent.frame(), ...) {
 	
-	if (missing(call) == missing(expr)) stop("give only one of 'expr' and 'call'")
-	if (missing(call)) call <- substitute(expr)
-	isString <- (mode(call) == "character")
-	string <- if (isString) call
+	if (missing(expr) + missing(call) + missing(string) != 2)
+		stop("give only one of 'expr', 'call' and 'string'")
+	if (!missing(expr)) call <- substitute(expr)
+	isString <- !missing(string)
 	
 	# set default log function in case 'addToLog' is not defined
 	if (doLog || doFailureLog) {
@@ -137,28 +137,41 @@ pangoEscape <- function(x) {
 	x
 }
 
-guiTextInput <- function(text="", title="Text Input", prompt="", accepts.tab=T, wrap.mode=c("none", "char", "word", "word_char")) {
+guiTextInput <- function(text="", title="Text Input", prompt="", oneLiner=F, 
+	accepts.tab=T, wrap.mode=c("none", "char", "word", "word_char"), 
+	size=c(640, 400), width.chars=-1, focus.on.ok=!oneLiner) {
+		
 	wrap.mode <- match.arg(wrap.mode)
 	# construct dialog
 	editBox <- gtkDialog(title=title, NULL, NULL,
 		"OK", GtkResponseType["ok"], "Cancel", GtkResponseType["cancel"],
 		show = F)
 	editBox$setDefaultResponse(GtkResponseType["ok"])
-	editBox$setDefaultSize(640,400)
 	if (nchar(prompt) > 0) {
 		editBox[["vbox"]]$packStart(gtkLabel(prompt), expand=F, pad=2)
 	}
-	editTV <- gtkTextView()
-	setTextviewMonospace(editTV)
-	editTV$setWrapMode(GtkWrapMode[wrap.mode])
-	editTV$setAcceptsTab(accepts.tab)
-	setTextview(editTV, text)
-	scroller <- gtkScrolledWindow()
-	scroller$add(editTV)
-	scroller$setPolicy(GtkPolicyType["automatic"], GtkPolicyType["automatic"])
-	editBox[["vbox"]]$add(scroller)
+	if (oneLiner) {
+		editEntry <- gtkEntry()
+		editEntry['activates-default'] <- T
+		editEntry['text'] <- text
+		editEntry['width-chars'] <- width.chars
+		editBox[["vbox"]]$packStart(editEntry, pad=10)
+	} else {
+		editBox$setDefaultSize(size[1], size[2])
+		editTV <- gtkTextView()
+		setTextviewMonospace(editTV)
+		editTV$setWrapMode(GtkWrapMode[wrap.mode])
+		editTV$setAcceptsTab(accepts.tab)
+		setTextview(editTV, text)
+		scroller <- gtkScrolledWindow()
+		scroller$add(editTV)
+		scroller$setPolicy(GtkPolicyType["automatic"], GtkPolicyType["automatic"])
+		editBox[["vbox"]]$packStart(scroller)
+	}
+	# put focus on the OK button
+	if (focus.on.ok) editBox[["actionArea"]]$getChildren()[[2]]$grabFocus()
 	result <- editBox$run() # make it modal
-	newTxt <- getTextviewText(editTV)
+	newTxt <- if (oneLiner) editEntry['text'] else getTextviewText(editTV)
 	editBox$destroy()
 	if (result != GtkResponseType["ok"]) return(invisible(NULL))
 	newTxt
@@ -253,7 +266,22 @@ setTextviewMonospace <- function(tv)
   invisible(NULL)
 }
 
-Filters <- structure(c("R or S files (*.R,*.q,*.ssc,*.S)", "Postscript files (*.ps)", "PDF files (*.pdf)", "Png files (*.png)",  "Jpeg files (*.jpeg,*.jpg)",  "Text files (*.txt)", "R images (*.RData,*.rda)", "Zip files (*.zip)",  "All files (*.*)", "*.R;*.q;*.ssc;*.S", "*.ps", "*.pdf",  "*.png", "*.jpeg;*.jpg", "*.txt", "*.RData;*.rda", "*.zip",  "*.*"), .Dim = c(9L, 2L), .Dimnames = list(c("R", "ps",  "pdf", "png", "jpeg", "txt", "RData", "zip", "All"), NULL))
+Filters <- matrix(c(
+	"R or S files (*.R,*.q,*.ssc,*.S)", "*.R;*.q;*.ssc;*.S",
+	"Postscript files (*.ps)",          "*.ps",             
+	"Encapsulated Postscript (*.eps)",  "*.eps",            
+	"PDF files (*.pdf)",                "*.pdf",            
+	"Png files (*.png)",                "*.png",            
+	"Jpeg files (*.jpeg,*.jpg)",        "*.jpeg;*.jpg",     
+	"Text files (*.txt)",               "*.txt",            
+	"R images (*.RData,*.rda)",         "*.RData;*.rda",    
+	"Zip files (*.zip)",                "*.zip",            
+	"SVG files (*.svg)",                "*.svg",            
+	"Windows Metafiles (*.wmf,*.emf)",  "*.wmf;*.emf",      
+	"xfig files (*.fig)",               "*.fig",            
+	"All files (*.*)",                  "*.*"), ncol=2, byrow=T,
+	dimnames=list(c('R','ps','eps','pdf','png','jpeg','txt',
+	'RData','zip','svg','wmf','fig','All'),NULL))
 
 # returns character string, or NA if cancelled
 choose.file.save <- function(default="", caption="Save File", filters=Filters[c("All"),], index=0) {

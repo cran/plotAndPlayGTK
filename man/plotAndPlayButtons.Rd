@@ -92,7 +92,7 @@ xy.coords.call(the.call, envir = parent.frame(), log = NULL, recycle = TRUE)
   \code{plotAndPlayGetToolbar} returns the \code{gtkToolbar}, 
   and \code{plotAndPlayGetDA} returns the \code{gtkDrawingArea}.
   
-  \code{plotAndPlaySetRawXLim} converts a numeric range, in the raw native plot coordinates, to a values suitable for 
+  \code{plotAndPlaySetRawXLim} converts a numeric range, in the raw native plot coordinates, to values suitable for 
   the plot \code{xlim} argument: it may convert back from log-transformed scales, convert to factor levels,
   and convert to a date/time format. It then updates the current plot call with the new value.
   Note: this function requires a panel to be in focus, since it uses \code{trellis.panelArgs()}. 

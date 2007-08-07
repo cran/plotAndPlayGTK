@@ -6,7 +6,7 @@
 
 MAJOR <- "0"
 MINOR <- "8"
-REVISION <- unlist(strsplit("$Revision: 51 $", split=" "))[2]
+REVISION <- unlist(strsplit("$Revision: 55 $", split=" "))[2]
 VERSION <- paste(MAJOR, MINOR, REVISION, sep=".")
 COPYRIGHT <- paste("(c) 2007 Felix Andrews <felix@nfrac.org>",
 	"with contributions from Deepayan Sarkar and Graham Williams")
@@ -33,7 +33,9 @@ if (!exists("StateEnv", environment(), inherits=FALSE)) {
 }
 
 plotAndPlayButtons <- alist(
+	annotate=makeAnnotateMenuButton(),
 	identify=makeIdentifyMenuButton(),
+	zoom=makeZoomMenuButton(),
 	identify.simple=quickTool("Label points", "gtk-info", tooltip="Identify data points by clicking on them", f=.plotAndPlay_identify_event),
 	zoomin=quickTool("Zoom to...", "gtk-zoom-in", tooltip="Select plot region with the mouse", f=.plotAndPlay_zoomin_event),
 	zoomout=quickTool("Zoom out", "gtk-zoom-out", f=.plotAndPlay_zoomout_event),
@@ -54,14 +56,14 @@ plotAndPlayButtons <- alist(
 	focus=quickTool("Choose panel", "gtk-select-color", tooltip="Choose a panel to focus on (for further interaction)", f=.plotAndPlay_focus_event),
 	expand=quickTool("Expand panel", "gtk-fullscreen", tooltip="Choose a panel to expand and focus (for further interaction)", f=.plotAndPlay_expand_event, isToggle=T),
 	prev.page=quickTool("Prev page", "gtk-go-back-ltr", f=.plotAndPlay_prevpage_event),
-	next.page=quickTool("Next page", "gtk-go-forward-ltr", f=.plotAndPlay_nextpage_event)
+	next.page=quickTool("Next page", "gtk-go-forward-ltr", f=.plotAndPlay_nextpage_event),
+	edit=quickTool("Edit call", "gtk-italic", tooltip="Edit the plot call as text", f=.plotAndPlay_edit_event)
 )
 
 plotAndPlayBasicButtons <- alist(
-	gtkSeparatorToolItem(),
-	edit=quickTool("Edit call", "gtk-italic", tooltip="Edit the plot call as text", f=.plotAndPlay_edit_event),
 	save=makeSaveMenuButton(),
 	copy=quickTool("Copy", "gtk-copy", tooltip="Copy this plot to the clipboard (as a bitmap)", f=.plotAndPlay_copy_event),
+	print=quickTool("Print", "gtk-print", f=.plotAndPlay_print_event),
 	greyscale=quickTool("Greyscale", "gtk-print-preview", tooltip="Switch to the greyscale lattice theme (then save the plot for printing)", f=.plotAndPlay_greyscale_event, isToggle=T)
 )
 
@@ -72,9 +74,40 @@ quickTool <- function(label, icon.name=NULL, tooltip=NULL, f, data=NULL, isToggl
 	if (!is.null(tooltip)) {
 		thisTips <- gtkTooltips()
 		thisTips$setTip(x, tooltip)
+		thisTips$enable()
 	}
 	gSignalConnect(x, "clicked", f, data=data)
 	x
+}
+
+makeAnnotateMenuButton <- function() {
+	annButton <- gtkMenuToolButton(gtkImageNewFromStock("gtk-edit", 
+		size=GtkIconSize['small-toolbar']), label="Annotate")
+	thisTips <- gtkTooltips()
+	thisTips$setTip(annButton, "Add your own labels to the plot")
+	gSignalConnect(annButton, "clicked", .plotAndPlay_annotate_event,
+		data=list(figure=TRUE))
+	annMenu <- gtkMenu()
+	itemFigLabel <- gtkMenuItem("Add label to figure")
+	itemPlotLabel <- gtkMenuItem("Add label inside plot region")
+	itemFigArrow <- gtkMenuItem("Add arrow to figure")
+	itemPlotArrow <- gtkMenuItem("Add arrow inside plot region")
+	itemClear <- gtkMenuItem("Clear annotations")
+	annMenu$append(itemFigLabel)
+	annMenu$append(itemPlotLabel)
+	annMenu$append(itemFigArrow)
+	annMenu$append(itemPlotArrow)
+	annMenu$append(itemClear)
+	annButton$setMenu(annMenu)
+	gSignalConnect(itemFigLabel, "activate", .plotAndPlay_annotate_event, 
+		data=list(figure=TRUE))
+	gSignalConnect(itemPlotLabel, "activate", .plotAndPlay_annotate_event)
+	gSignalConnect(itemFigArrow, "activate", .plotAndPlay_annotate_event, 
+		data=list(figure=TRUE, arrow=TRUE))
+	gSignalConnect(itemPlotArrow, "activate", .plotAndPlay_annotate_event, 
+		data=list(arrow=TRUE))
+	gSignalConnect(itemClear, "activate", .plotAndPlay_clear_event)
+	annButton
 }
 
 makeIdentifyMenuButton <- function() {
@@ -84,14 +117,31 @@ makeIdentifyMenuButton <- function() {
 	thisTips$setTip(idButton, "Identify data points by clicking on them")
 	gSignalConnect(idButton, "clicked", .plotAndPlay_identify_event)
 	idMenu <- gtkMenu()
-	idItemRegion <- gtkMenuItem("Label all points in a region")
-	idItemClear <- gtkMenuItem("Clear labels")
-	idMenu$append(idItemRegion)
-	idMenu$append(idItemClear)
+	itemRegion <- gtkMenuItem("Label all points in a region")
+	itemClear <- gtkMenuItem("Clear labels")
+	idMenu$append(itemRegion)
+	idMenu$append(itemClear)
 	idButton$setMenu(idMenu)
-	gSignalConnect(idItemRegion, "activate", .plotAndPlay_identify_region_event)
-	gSignalConnect(idItemClear, "activate", .plotAndPlay_clear_event)
+	gSignalConnect(itemRegion, "activate", .plotAndPlay_identify_region_event)
+	gSignalConnect(itemClear, "activate", .plotAndPlay_clear_event)
 	idButton
+}
+
+makeZoomMenuButton <- function() {
+	zoomButton <- gtkMenuToolButton(gtkImageNewFromStock("gtk-zoom-in", 
+		size=GtkIconSize['small-toolbar']), label="Zoom to...")
+	thisTips <- gtkTooltips()
+	thisTips$setTip(zoomButton, "Select new plot region with the mouse")
+	gSignalConnect(zoomButton, "clicked", .plotAndPlay_zoomin_event)
+	zMenu <- gtkMenu()
+	itemZoomout <- gtkMenuItem("Zoom out")
+	itemZoomfit <- gtkMenuItem("Zoom to fit")
+	zMenu$append(itemZoomout)
+	zMenu$append(itemZoomfit)
+	zoomButton$setMenu(zMenu)
+	gSignalConnect(itemZoomout, "activate", .plotAndPlay_zoomout_event)
+	gSignalConnect(itemZoomfit, "activate", .plotAndPlay_zoomfit_event)
+	zoomButton
 }
 
 makeSaveMenuButton <- function() {
@@ -102,11 +152,17 @@ makeSaveMenuButton <- function() {
 	saveItemPDF <- gtkMenuItem("PDF")
 	saveItemPNG <- gtkMenuItem("PNG (bitmap)")
 	saveItemPS <- gtkMenuItem("PostScript")
+	saveItemEPS <- gtkMenuItem("EPS")
 	saveItemSVG <- gtkMenuItem("SVG")
+	saveItemWMF <- gtkMenuItem("WMF")
+	saveItemXfig <- gtkMenuItem("xfig")
 	saveMenu$append(saveItemPDF)
 	saveMenu$append(saveItemPNG)
 	saveMenu$append(saveItemPS)
+	saveMenu$append(saveItemEPS)
 	saveMenu$append(saveItemSVG)
+	saveMenu$append(saveItemWMF)
+	saveMenu$append(saveItemXfig)
 	saveButton$setMenu(saveMenu)
 	gSignalConnect(saveItemPDF, "activate", .plotAndPlay_save_event, 
 		data=list(ext="pdf"))
@@ -114,10 +170,19 @@ makeSaveMenuButton <- function() {
 		data=list(ext="png"))
 	gSignalConnect(saveItemPS, "activate", .plotAndPlay_save_event, 
 		data=list(ext="ps"))
+	gSignalConnect(saveItemEPS, "activate", .plotAndPlay_save_event, 
+		data=list(ext="eps"))
 	gSignalConnect(saveItemSVG, "activate", .plotAndPlay_save_event, 
 		data=list(ext="svg"))
+	gSignalConnect(saveItemWMF, "activate", .plotAndPlay_save_event, 
+		data=list(ext="wmf"))
+	gSignalConnect(saveItemXfig, "activate", .plotAndPlay_save_event, 
+		data=list(ext="fig"))
 	saveButton
 }
+
+# allow annotations in original plot call (as "{" or expression())
+# allow edit stored annotations
 
 # look at rpanel and tkwidgets and GeoXP and iplots etc
 
@@ -125,6 +190,9 @@ makeSaveMenuButton <- function() {
 # off = ~ data | which
 # on = ~ data,  groups=which
 # hmm = data ~ which
+
+# gtkColorButton(color)
+# gtkFontButton
 
 #gdkPixbufGetFromDrawable(dest = NULL, src, cmap = NULL, src.x, src.y, dest.x, dest.y, width, height)
 #"gtk-index" (layers)
@@ -135,9 +203,9 @@ latticeNames <- c("barchart", "bwplot", "cloud", "contourplot", "densityplot",
 	"splom", "stripplot", "tmd", "wireframe", "xyplot")
 
 playwith <- function(expr, name="plot", nav.scales=c("x","y"), trans.scales=c("y"), 
-	buttons=list("identify", "zoomin", "zoomout", "zoomfit", "centre"), 
+	buttons=list("annotate", "identify", "zoom", "centre"), 
 	extra.buttons=list("zero"), basic.buttons=plotAndPlayBasicButtons, 
-	labels=NULL, label.args=list(cex=0.7), identify.call=NULL, plot.call, 
+	labels=NULL, label.args=list(cex=1), identify.call=NULL, plot.call, 
 	is.lattice=(callName %in% latticeNames), eval.args=NA, invert.match=F,
 	envir=parent.frame(), restore.on.close=NULL) {
 	
@@ -160,17 +228,27 @@ playwith <- function(expr, name="plot", nav.scales=c("x","y"), trans.scales=c("y
 		if (is.character(basic.buttons)) basic.buttons <- as.list(basic.buttons) else
 		stop("'basic.buttons' should be a list (of character or calls) or NULL")
 	}
-	# put call into canonical form and maybe evaluate its arguments
-	plot.call <- match.call(eval(plot.call[[1]], envir), plot.call)
-	env <- new.env()
+	# put call into canonical form
+	callFun <- eval(plot.call[[1]], envir)
+	callName <- paste(deparse(plot.call[[1]]), collapse="")
+	if ((typeof(callFun) == "closure") && !is.null(formals(callFun))) {
+		plot.call <- match.call(callFun, plot.call)
+		if (is.lattice) names(plot.call)[2] <- ""
+	} else {
+		# the call does not accept arguments (or is a primitive)
+		if (missing(buttons) && missing(extra.buttons)) {
+			buttons <- list("annotate")
+			extra.buttons <- NULL
+		}
+	}
 	# work out evalulation rules
+	env <- new.env()
 	inherits <- !is.na(eval.args)
 	if (is.na(eval.args)) eval.args <- (environmentName(envir) != "R_GlobalEnv")
 	if (!identical(eval.args, FALSE)) {
 		copyArgsIntoEnv(plot.call, envir=envir, newEnv=env, inherits=inherits, 
 			pattern=eval.args, invert.match=invert.match)
 	}
-	callName <- deparse(plot.call[[1]])
 	# lattice check
 	if (is.lattice && !exists("panel.brush.splom")) {
 		stop("Need version >= 0.16 of the lattice package.")
@@ -179,7 +257,7 @@ playwith <- function(expr, name="plot", nav.scales=c("x","y"), trans.scales=c("y
 		!(callName %in% c("splom", "cloud", "levelplot",
 			"contourplot", "wireframe", "parallel")) ) {
 		# need this for correctly identifying points
-		plot.call$subscripts <- TRUE
+		plot.call$subscripts <- quote(T)
 	}
 	# try to construct a call to identify() if it was not supplied
 	if (is.null(identify.call)) {
@@ -197,7 +275,7 @@ playwith <- function(expr, name="plot", nav.scales=c("x","y"), trans.scales=c("y
 				}
 				if (is.null(labels)) {
 					# try to get labels from formula
-					tmp.x <- eval(plot.call$x, env)
+					tmp.x <- eval(plot.call[[2]], env)
 					if (inherits(tmp.x, "formula")) {
 						xObj <- if (length(tmp.x) == 2)
 							tmp.x[[2]] else tmp.x[[3]]
@@ -205,15 +283,10 @@ playwith <- function(expr, name="plot", nav.scales=c("x","y"), trans.scales=c("y
 							c("|", "*", "+"))
 							xObj <- xObj[[2]]
 						xObj <- eval(xObj, tmp.data, environment(tmp.x))
-						labels <- row.names(xObj)
-						if (inherits(xObj, "POSIXt"))
-							labels <- format(xObj)
-						if (inherits(xObj, "Date"))
-							labels <- format(xObj)
+						labels <- makeLabels(xObj)
 						
-					} else if (is.ts(tmp.x) ||
-						inherits(tmp.x, "zoo")) {
-						labels <- rep(format(stats::time(tmp.x)), NCOL(tmp.x))
+					} else {
+						labels <- makeLabels(tmp.x)
 					}
 				}
 			}
@@ -232,17 +305,10 @@ playwith <- function(expr, name="plot", nav.scales=c("x","y"), trans.scales=c("y
 						xObj <- if (length(tmp.x) == 2)
 							tmp.x[[2]] else tmp.x[[3]]
 						xObj <- eval(xObj, environment(tmp.x), env)
-						labels <- row.names(xObj)
-						if (inherits(xObj, "POSIXt"))
-							labels <- format(xObj)
-						if (inherits(xObj, "Date"))
-							labels <- format(xObj)
+						labels <- makeLabels(xObj)
 						
-					} else if (inherits(tmp.x, "ts") ||
-						inherits(tmp.x, "zoo")) {
-						labels <- format(stats::time(tmp.x))
 					} else {
-						labels <- row.names(tmp.x)
+						labels <- makeLabels(tmp.x)
 					}
 				}
 			}
@@ -284,22 +350,23 @@ playwith <- function(expr, name="plot", nav.scales=c("x","y"), trans.scales=c("y
 		StateEnv[[name]]$call <- NULL
 		plot.new()
 		# remove the toolbar, it will be recreated
-		plotAndPlayGetToolbar()$destroy()
+		myWin$getChildren()[[1]]$getChildren()[[3]]$destroy()
+		myWin$getChildren()[[1]]$getChildren()[[2]]$destroy()
 	}
 	
 	# set which buttons are visible
 	if (is.lattice &&
 		(callName %in% c("cloud", "wireframe")) ) {
 		if (is.null(plot.call$zoom)) plot.call$zoom <- 1
-		if (is.null(plot.call$screen)) plot.call$screen <- list(z = 40, x = -60)
-		if (missing(buttons)) buttons <- list("zoomin.3d", "zoomout.3d", 
-			"fly.left.3d", "fly.right.3d")
+		if (is.null(plot.call$screen)) plot.call$screen <- quote(list(z=40, x=-60))
+		if (missing(buttons)) buttons <- list("annotate",
+			"zoomin.3d", "zoomout.3d", "fly.left.3d", "fly.right.3d")
 		if (missing(extra.buttons)) extra.buttons <- list()
 	}
 	if (is.lattice &&
 	(callName %in% c("splom")) ) {
-		if (missing(buttons)) buttons <- list("brush", "brush.region", 
-			"brush.drag", "clear")
+		if (missing(buttons)) buttons <- list("annotate",
+			"brush", "brush.region", "brush.drag", "clear")
 		if (missing(extra.buttons)) extra.buttons <- list()
 	}
 	buttons <- c(buttons, extra.buttons)
@@ -321,10 +388,11 @@ playwith <- function(expr, name="plot", nav.scales=c("x","y"), trans.scales=c("y
 		if (nPerPage > 1) buttons <- c(buttons, "expand")
 	}
 	if (!is.lattice) basic.buttons$greyscale <- NULL
+	if (length(buttons) > 0) buttons <- c(buttons, gtkSeparatorToolItem())
 	buttons <- c(buttons, basic.buttons)
 	# create the toolbar
 	theToolbar <- gtkToolbar()
-	theToolbar[["toolbar-style"]] <- GtkToolbarStyle['both']
+	theToolbar["toolbar-style"] <- GtkToolbarStyle['both']
 	myVBox$packStart(theToolbar, expand=FALSE)
 	# add buttons
 	for (i in seq_along(buttons)) {
@@ -337,6 +405,18 @@ playwith <- function(expr, name="plot", nav.scales=c("x","y"), trans.scales=c("y
 		}
 		theToolbar$insert(newButton, -1)
 	}
+	# add the call bar
+	callHBox <- gtkHBox()
+	callEntry <- gtkEntry()
+	callEntry['has-frame'] <- FALSE
+	callEditButton <- gtkButton(label="Edit call...")
+	gSignalConnect(callEntry, "editing-done", .plotAndPlay_edit_in_place_event)
+	gSignalConnect(callEntry, "activate", .plotAndPlay_edit_in_place_event)
+	gSignalConnect(callEditButton, "clicked", .plotAndPlay_edit_event)
+	#tooltip="Edit the plot call as text"
+	callHBox$packStart(callEntry)
+	callHBox$packStart(callEditButton, expand=FALSE, pad=5)
+	myVBox$packStart(callHBox, expand=FALSE)
 	# set StateEnv$.current to 'name' whenever this window comes to front
 	gSignalConnect(myWin, "focus-in-event", 
 		.plotAndPlay_window_focus_in_event, data=list(name=name))
@@ -380,7 +460,7 @@ playwith <- function(expr, name="plot", nav.scales=c("x","y"), trans.scales=c("y
 .plotAndPlay_window_focus_out_event <- function(widget, event, user.data) {
 	name <- user.data$name
 	# revert to previous device
-	dev.set(StateEnv[[name]]$old.dev)
+	#dev.set(StateEnv[[name]]$old.dev)
 	return(FALSE)
 }
 
@@ -409,9 +489,9 @@ playwith <- function(expr, name="plot", nav.scales=c("x","y"), trans.scales=c("y
 	myExt <- if (!missing(user.data) && !is.null(user.data$ext)) 
 		user.data$ext else 'pdf'
 	myDefault <- paste(name, '.', myExt, sep='')
-	filename <- choose.file.save(myDefault, caption="Save plot (pdf/png/ps/svg)", 
-		filters=Filters[c("pdf","png","ps","All"),],
-		index=match(myExt, c("pdf","png","ps","svg"))
+	filename <- choose.file.save(myDefault, caption="Save plot (pdf/png/ps/etc)", 
+		filters=Filters[c("pdf","png","ps","eps","svg","wmf","fig"),],
+		index=match(myExt, c("pdf","png","ps","eps","svg","wmf","fig"))
 	)
 	StateEnv[[name]]$win$present()
 	if (is.na(filename)) return()
@@ -431,8 +511,13 @@ playwith <- function(expr, name="plot", nav.scales=c("x","y"), trans.scales=c("y
 		dev.copy(pdf, file=filename, width=myWidth, height=myHeight)
 		dev.off()
 	}
-	else if (ext %in% c("ps", "eps")) {
+	else if (ext %in% "ps") {
 		dev.copy(postscript, file=filename, width=myWidth, height=myHeight)
+		dev.off()
+	}
+	else if (ext %in% "eps") {
+		dev.copy(postscript, file=filename, width=myWidth, height=myHeight,
+			horizontal=FALSE, onefile=FALSE, paper="special")
 		dev.off()
 	}
 	else if (ext %in% "png") {
@@ -441,6 +526,14 @@ playwith <- function(expr, name="plot", nav.scales=c("x","y"), trans.scales=c("y
 	}
 	else if (ext %in% "svg") {
 		dev.copy(Cairo_svg, file=filename, width=myWidth, height=myHeight)
+		dev.off()
+	}
+	else if (ext %in% c("wmf", "emf")) {
+		dev.copy(win.metafile, file=filename, width=myWidth, height=myHeight)
+		dev.off()
+	}
+	else if (ext %in% "fig") {
+		dev.copy(xfig, file=filename, width=myWidth, height=myHeight)
 		dev.off()
 	}
 	else {
@@ -467,6 +560,17 @@ playwith <- function(expr, name="plot", nav.scales=c("x","y"), trans.scales=c("y
 	im <- gdkPixbufNewFromFile(filename)$retval
 	gtkClipboardGet("CLIPBOARD")$setImage(im)
 	file.remove(filename)
+}
+
+.plotAndPlay_print_event <- function(widget, user.data) {
+	name <- StateEnv$.current
+	# disable other plot buttons until this is over
+	plotAndPlayGetToolbar()$setSensitive(F)
+	on.exit(plotAndPlayGetToolbar()$setSensitive(T))
+	# print plot
+	isWindows <- (.Platform$OS.type == "windows")
+	if (isWindows) dev.print(win.print)
+	else dev.print()
 }
 
 .plotAndPlay_greyscale_event <- function(widget, user.data) {
@@ -1037,6 +1141,7 @@ playwith <- function(expr, name="plot", nav.scales=c("x","y"), trans.scales=c("y
 	name <- StateEnv$.current
 	StateEnv[[name]]$ids <- list()
 	StateEnv[[name]]$brushed <- list()
+	StateEnv[[name]]$annotations <- list()
 	plotAndPlayUpdate()
 }
 
@@ -1069,7 +1174,7 @@ playwith <- function(expr, name="plot", nav.scales=c("x","y"), trans.scales=c("y
 			} else if (max(xlim) < 0) {
 				xlim[which.max(xlim)] <- 0 + 0.07 * max(abs(xlim))
 			}
-			StateEnv[[name]]$call$xlim <- xlim
+			StateEnv[[name]]$call$xlim <- signif(xlim, 4)
 		}
 		if (trans.y) {
 			if (min(ylim) > 0) {
@@ -1077,7 +1182,7 @@ playwith <- function(expr, name="plot", nav.scales=c("x","y"), trans.scales=c("y
 			} else if (max(ylim) < 0) {
 				ylim[which.max(ylim)] <- 0 + 0.07 * max(abs(ylim))
 			}
-			StateEnv[[name]]$call$ylim <- ylim
+			StateEnv[[name]]$call$ylim <- signif(ylim, 4)
 		}
 	} else {
 		if (trans.x) StateEnv[[name]]$call$xlim <- NULL
@@ -1113,6 +1218,129 @@ playwith <- function(expr, name="plot", nav.scales=c("x","y"), trans.scales=c("y
 	plotAndPlayUpdate()
 }
 
+.plotAndPlay_annotate_event <- function(widget, user.data) {
+	name <- StateEnv$.current
+	isFigure <- (!missing(user.data) && isTRUE(user.data$figure))
+	isArrow <- (!missing(user.data) && isTRUE(user.data$arrow))
+	# disable other plot buttons until this is over
+	plotAndPlayGetToolbar()$setSensitive(F)
+	on.exit(plotAndPlayGetToolbar()$setSensitive(T))
+	# set up prompt
+	plotAndPlayMakePrompt()
+	on.exit(plotAndPlayUnmakePrompt(), add=T)
+	# get location
+	myPacket <- "all"
+	myPrompt <- "Click to place a label inside the plot region"
+	if (isFigure) myPrompt <- "Click to place a label on the figure"
+	if (isArrow) myPrompt <- "Click at the start of the arrow (\"from\")"
+	nextPrompt <- "OK, now click at the end of the arrow (\"to\")"
+	
+	if (StateEnv[[name]]$is.lattice) {
+		if (isFigure) {
+			trellis.focus("toplevel", highlight=F)
+			plotAndPlaySetPrompt(myPrompt)
+		} else {
+			newFocus <- plotAndPlayDoFocus()
+			if (!any(newFocus)) return()
+			myPacket <- as.character(packet.number())
+			plotAndPlaySetPrompt(myPrompt)
+		}
+		on.exit(trellis.unfocus(), add=T)
+		clickLoc <- grid.locator()
+		if (is.null(clickLoc)) return()
+		clickLoc <- lapply(clickLoc, as.numeric)
+		clickLoc <- lapply(clickLoc, signif, 4)
+		if (isArrow) {
+			plotAndPlaySetPrompt(nextPrompt)
+			clickLoc1 <- grid.locator()
+			if (is.null(clickLoc1)) return()
+			clickLoc1 <- lapply(clickLoc1, as.numeric)
+			clickLoc1 <- lapply(clickLoc1, signif, 4)
+			theCall <- call('panel.arrows', x0=clickLoc$x, y0=clickLoc$y,
+				x1=clickLoc1$x, y1=clickLoc1$y, length=0.2)
+		} else {
+			myText <- guiTextInput(title="Label text", oneLiner=T)
+			if (is.null(myText)) return()
+			theCall <- call('panel.text', myText, x=clickLoc$x, y=clickLoc$y)
+		}
+		# add user-specified default style
+		theCall <- as.call(c(as.list(theCall), StateEnv[[name]]$label.args))
+		
+	} else {
+		# traditional graphics plot
+		plotAndPlaySetPrompt(myPrompt)
+		if (isFigure) op <- par(usr=rep(0:1,2), mar=rep(0,4), xpd=NA)
+		clickLoc <- locator(n=1)
+		if (is.null(clickLoc)) return()
+		clickLoc <- lapply(clickLoc, signif, 4)
+		if (isArrow) {
+			plotAndPlaySetPrompt(nextPrompt)
+			clickLoc1 <- locator(n=1)
+			if (is.null(clickLoc1)) return()
+			clickLoc1 <- lapply(clickLoc1, signif, 4)
+			theCall <- call('arrows', x0=clickLoc$x, y0=clickLoc$y,
+				x1=clickLoc1$x, y1=clickLoc1$y, length=0.2)
+		} else {
+			myText <- guiTextInput(title="Label text", oneLiner=T)
+			if (is.null(myText)) return()
+			theCall <- call('text', myText, x=clickLoc$x, y=clickLoc$y)
+		}
+		# add user-specified default style
+		theCall <- as.call(c(as.list(theCall), StateEnv[[name]]$label.args))
+		# revert graphical settings
+		if (isFigure) par(op)
+		if (isFigure) {
+			theCall <- bquote({
+				op <- par(usr=rep(0:1,2), mar=rep(0,4), xpd=NA)
+				.(theCall)
+				par(op)
+			})
+		}
+	}
+	# allow user to edit the annotation call
+	callTxt <- paste(deparse(theCall, control=c("showAttributes"),
+		width=55), collapse="\n")
+	repeat {
+		newTxt <- guiTextInput(callTxt, title="Edit plot annotation", 
+			accepts.tab=F)
+		if (is.null(newTxt)) break
+		callTxt <- newTxt
+		tmp <- tryCatch(parse(text=callTxt)[[1]], error=function(e)e)
+		# check whether there was a syntax error
+		if (inherits(tmp, "error")) {
+			errorDialog(paste("Error:", conditionMessage(tmp)))
+		} else {
+			# add the annotation
+			eval(tmp, StateEnv[[name]]$env)
+			StateEnv[[name]]$annotations[[myPacket]] <- 
+				c(StateEnv[[name]]$annotations[[myPacket]], tmp)
+			break
+		}
+	}
+	StateEnv[[name]]$win$present()
+}
+
+.plotAndPlay_edit_in_place_event <- function(widget, user.data) {
+	name <- StateEnv$.current
+	# disable other plot buttons until this is over
+	plotAndPlayGetToolbar()$setSensitive(F)
+	on.exit(plotAndPlayGetToolbar()$setSensitive(T))
+	# the original call -- this should match the code in plotAndPlayUpdate!
+	callTxt <- deparseOneLine(StateEnv[[name]]$call, control="showAttributes")
+	newTxt <- widget$getText()
+	if (identical(newTxt, callTxt)) return()
+	if (identical(newTxt, "")) return()
+	tmp <- tryCatch(parse(text=newTxt)[[1]], error=function(e)e)
+	# check whether there was a syntax error
+	if (inherits(tmp, "error")) {
+		errorDialog(paste("Error:", conditionMessage(tmp)))
+		StateEnv[[name]]$win$present()
+	} else {
+		StateEnv[[name]]$call <- tmp
+		plotAndPlayUpdate()
+	}
+}
+
 .plotAndPlay_edit_event <- function(widget, user.data) {
 	name <- StateEnv$.current
 	# disable other plot buttons until this is over
@@ -1120,7 +1348,7 @@ playwith <- function(expr, name="plot", nav.scales=c("x","y"), trans.scales=c("y
 	on.exit(plotAndPlayGetToolbar()$setSensitive(T))
 	theCall <- StateEnv[[name]]$call
 	callTxt <- paste(deparse(theCall, control=c("showAttributes"),
-		width=54), collapse="\n")
+		width=55), collapse="\n")
 	repeat {
 		newTxt <- guiTextInput(callTxt, title="Edit plot call", 
 			prompt="", accepts.tab=F)
@@ -1141,38 +1369,44 @@ playwith <- function(expr, name="plot", nav.scales=c("x","y"), trans.scales=c("y
 
 .plotAndPlay_zoomin3d_event <- function(widget, user.data) {
 	name <- StateEnv$.current
-	StateEnv[[name]]$call$zoom <- StateEnv[[name]]$call$zoom * 1.5
+	zoom <- eval(StateEnv[[name]]$call$zoom, StateEnv[[name]]$env)
+	StateEnv[[name]]$call$zoom <- signif(zoom * 1.5, 4)
 	plotAndPlayUpdate()
 }
 
 .plotAndPlay_zoomout3d_event <- function(widget, user.data) {
 	name <- StateEnv$.current
-	StateEnv[[name]]$call$zoom <- StateEnv[[name]]$call$zoom / 1.5
+	zoom <- eval(StateEnv[[name]]$call$zoom, StateEnv[[name]]$env)
+	StateEnv[[name]]$call$zoom <- signif(zoom / 1.5, 4)
 	plotAndPlayUpdate()
 }
 
 .plotAndPlay_flyleft3d_event <- function(widget, user.data) {
 	name <- StateEnv$.current
-	StateEnv[[name]]$call$screen <- c(z=45, StateEnv[[name]]$call$screen)
+	screen <- eval(StateEnv[[name]]$call$screen, StateEnv[[name]]$env)
+	if (names(screen)[1] == 'z') screen[[1]] <- screen[[1]] + 45
+	else screen <- c(z = 45, screen)
+	# convert list to call so that deparse is pretty
+	StateEnv[[name]]$call$screen <- as.call(c(quote(list), screen))
 	plotAndPlayUpdate()
 }
 
 .plotAndPlay_flyright3d_event <- function(widget, user.data) {
 	name <- StateEnv$.current
-	StateEnv[[name]]$call$screen <- c(z=-45, StateEnv[[name]]$call$screen)
+	screen <- eval(StateEnv[[name]]$call$screen, StateEnv[[name]]$env)
+	if (names(screen)[1] == 'z') screen[[1]] <- screen[[1]] - 45
+	else screen <- c(z = -45, screen)
+	# convert list to call so that deparse is pretty
+	StateEnv[[name]]$call$screen <- as.call(c(quote(list), screen))
 	plotAndPlayUpdate()
 }
 
 .plotAndPlay_flyup3d_event <- function(widget, user.data) {
 	name <- StateEnv$.current
-	StateEnv[[name]]$call$screen <- c(x=15, y=15, StateEnv[[name]]$call$screen)
-	plotAndPlayUpdate()
 }
 
 .plotAndPlay_flydown3d_event <- function(widget, user.data) {
 	name <- StateEnv$.current
-	StateEnv[[name]]$call$screen <- c(x=-15, y=-15, StateEnv[[name]]$call$screen)
-	plotAndPlayUpdate()
 }
 
 .plotAndPlay_prevpage_event <- function(widget, user.data) {
@@ -1217,6 +1451,11 @@ plotAndPlayDoFocus <- function(highlight=T, ...) {
 
 plotAndPlayUpdate <- function() {
 	name <- StateEnv$.current
+	# add current call to text box
+	callTxt <- deparseOneLine(StateEnv[[name]]$call, control="showAttributes")
+	plotAndPlayGetCallEntry()$setText(callTxt)
+	#plotAndPlayGetCallEntry()$setPosition(0)
+	# do the plot
 	result <- eval(StateEnv[[name]]$call, StateEnv[[name]]$env)
 	if (inherits(result, "trellis")) {
 		# plot trellis object
@@ -1273,10 +1512,12 @@ plotAndPlayUpdate <- function() {
 		}
 		# draw annotations
 		for (myPacket in names(StateEnv[[name]]$annotations)) {
-			if (myPacket == "toplevel") {
+			if (myPacket == "all") {
+				trellis.focus("toplevel", highlight=F)
 				for (expr in StateEnv[[name]]$annotations[[myPacket]]) {
 					eval(expr, StateEnv[[name]]$env)
 				}
+				trellis.unfocus()
 				next
 			}
 			whichOne <- which(packets == as.numeric(myPacket))
@@ -1324,6 +1565,11 @@ plotAndPlayGetDA <- function() {
 plotAndPlayGetToolbar <- function() {
 	name <- StateEnv$.current
 	StateEnv[[name]]$win$getChildren()[[1]]$getChildren()[[2]]
+}
+
+plotAndPlayGetCallEntry <- function() {
+	name <- StateEnv$.current
+	StateEnv[[name]]$win$getChildren()[[1]]$getChildren()[[3]]$getChildren()[[1]]
 }
 
 plotAndPlayMakePrompt <- function() {
@@ -1399,6 +1645,7 @@ plotAndPlaySetRawLim <- function(x, x.or.y=c("x", "y")) {
 			}
 		}
 	}
+	if ("numeric" %in% class(x)) x <- signif(x, 4)
 	if (x.or.y == "x") StateEnv[[name]]$call$xlim <- x
 	if (x.or.y == "y") StateEnv[[name]]$call$ylim <- x
 }
@@ -1445,13 +1692,25 @@ latticeLogBase <- function(x) {
 	x
 }
 
+makeLabels <- function(x) {
+	labels <- row.names(x)
+	if (inherits(x, "POSIXt"))
+		labels <- format(x)
+	if (inherits(x, "Date"))
+		labels <- format(x)
+	if (inherits(x, "ts") || inherits(x, "zoo"))
+		labels <- rep(format(stats::time(x)), NCOL(x))
+	labels
+}
+
 xy.coords.call <- function(the.call, envir=parent.frame(), log=NULL, recycle=TRUE) {
 	stopifnot(is.call(the.call))
 	# put call into canonical form
 	the.call <- match.call(eval(the.call[[1]], envir=envir), the.call)
 	tmp.x <- eval(the.call$x, envir)
 	tmp.y <- if ('y' %in% names(the.call)) eval(the.call$y, envir)
-	#if (inherits(tmp.x, "zoo")) return(xy.coords(zoo::index(x), x[,1], log=log, recycle=recycle))
+	if (inherits(tmp.x, "zoo") && is.null(tmp.y)) 
+		return(xy.coords(stats::time(tmp.x), as.vector(tmp.x), log=log, recycle=recycle))
 	xy.coords(tmp.x, tmp.y, log=log, recycle=recycle)
 }
 
@@ -1503,6 +1762,15 @@ evalCallArgs <- function(myCall, envir=parent.frame(), pattern=T) {
 		}
 	}
 	return(myCall)
+}
+
+deparseOneLine <- function(expr, width.cutoff=500, ...) {
+	tmp <- deparse(expr, width.cutoff=width.cutoff, ...)
+	tmp <- paste(tmp, collapse=";")
+	tmp <- gsub("; +", "; ", tmp)
+	tmp <- gsub("\\{;", "\\{", tmp)
+	tmp <- gsub(";\\}", " \\}", tmp)
+	tmp
 }
 
 # based on grid::locator

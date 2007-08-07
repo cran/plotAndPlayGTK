@@ -5,14 +5,15 @@
   Execute a command, log it, and show error dialog on failure.
 }
 \usage{
-guiDo(expr, call, doLog = T, doFailureLog = doLog, logFunction = addToLog, 
+guiDo(expr, call, string, doLog = T, doFailureLog = doLog, logFunction = addToLog, 
       doFailureDialog = T, doStop = T, envir = if (doLog) .GlobalEnv else parent.frame(),
       ...)
 }
 \arguments{
-  \item{expr}{ an expression to run (\code{\link{eval}}), or a string to parse and run.
+  \item{expr}{ an expression to run (\code{\link{eval}}) in the given environment.
   To run multiple commands, wrap them in \{braces\}.}
-  \item{call}{ a \code{\link{call}} object, if given this is used instead of \code{expr}. }
+  \item{call}{ a \code{\link{call}} object. If given this is used instead of \code{expr}. }
+  \item{string}{ a string to parse and run. If given this is used instead of \code{expr}. }
   \item{doLog}{ whether to write the command to a log: see \code{logFunction}. }
   \item{doFailureLog}{ whether to log \code{"# FAILED"} if an error occurs. }
   \item{logFunction}{ a function to write text to the log, passed as the first argument. 
