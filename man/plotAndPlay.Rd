@@ -10,8 +10,8 @@ playwith(expr, name = "plot", nav.scales = c("x","y"), trans.scales = c("y"),
 	 buttons = list("annotate", "identify", "zoom", "zoomfit"), 
 	 extra.buttons = list("zero"), basic.buttons=plotAndPlayBasicButtons, 
 	 labels = NULL, label.args = list(cex = 1), identify.call = NULL, 
-	 plot.call, is.lattice = (callName \%in\% latticeNames), eval.args = NA, 
-	 invert.match = F, envir = parent.frame(), restore.on.close = NULL)
+	 plot.call, is.lattice = NA, eval.args = NA, invert.match = F, 
+	 envir = parent.frame(), restore.on.close = NULL)
 }
 \arguments{
   \item{expr}{ an expression to create a plot, like \code{plot(mydata)}. 
@@ -34,7 +34,7 @@ playwith(expr, name = "plot", nav.scales = c("x","y"), trans.scales = c("y"),
   	If missing, it will be constructed from the plot call. Generally this argument should not be needed. }
   \item{plot.call}{ a plot call ( \code{\link{call}} object), if given this is used instead of \code{expr}. }
   \item{is.lattice}{ whether the plot is a \link[lattice]{Lattice} plot, i.e. returns a trellis object.
-  	If the called function is in the \code{lattice} package it will be recognised automatically. }
+  	If \code{NA}, the call name is matched against known Lattice function names. }
   \item{eval.args}{ whether to evaluate the plot call arguments: can be \code{TRUE}, \code{FALSE}, \code{NA} (don't eval global vars) 
 	or a \link[=regex]{regular expression} matching symbols to evaluate. See below. }
   \item{invert.match}{ whether to evaluate arguments that do NOT match the regular expression given in \code{eval.args}. }

@@ -139,7 +139,7 @@ pangoEscape <- function(x) {
 
 guiTextInput <- function(text="", title="Text Input", prompt="", oneLiner=F, 
 	accepts.tab=T, wrap.mode=c("none", "char", "word", "word_char"), 
-	size=c(550, 320), width.chars=-1, focus.on.ok=!oneLiner) {
+	size=c(600, 320), width.chars=-1, focus.on.ok=!oneLiner) {
 	
 	wrap.mode <- match.arg(wrap.mode)
 	# construct dialog

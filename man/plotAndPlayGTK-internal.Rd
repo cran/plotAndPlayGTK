@@ -21,6 +21,7 @@
 \alias{.plotAndPlay_brush_drag_event}
 \alias{.plotAndPlay_clear_event}
 \alias{.plotAndPlay_annotate_event}
+\alias{.plotAndPlay_edit_annotations_event}
 \alias{.plotAndPlay_edit_in_place_event}
 \alias{.plotAndPlay_edit_event}
 \alias{.plotAndPlay_layers_event}
