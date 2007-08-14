@@ -7,7 +7,7 @@
 }
 \usage{
 playwith(expr, name = "plot", nav.scales = c("x","y"), trans.scales = c("y"), 
-	 buttons = list("annotate", "identify", "zoom", "centre"), 
+	 buttons = list("annotate", "identify", "zoom", "zoomfit"), 
 	 extra.buttons = list("zero"), basic.buttons=plotAndPlayBasicButtons, 
 	 labels = NULL, label.args = list(cex = 1), identify.call = NULL, 
 	 plot.call, is.lattice = (callName \%in\% latticeNames), eval.args = NA, 
@@ -51,11 +51,14 @@ playwith(expr, name = "plot", nav.scales = c("x","y"), trans.scales = c("y"),
 	  \item \code{"expand"} will be added to lattice plots with more than one panel per page. 
 	  An alternative is \code{"focus"}, which is the same but does not expand the chosen panel to the full window.
 	  \item \code{c("prev.page", "next.page")} will be added to lattice plots with more than one page.
+	  \item \code{"layers"} will be added to lattice plots with any of the arguments \code{"layers", "sp.layout", "panel"}.
 	  \item \code{c("zoomin.3d", "zoomout.3d", "fly.left.3d", "fly.right.3d")} will be added to \code{\link[lattice]{wireframe}} and \code{\link[lattice]{cloud}} 
 	  (note, these do not yet work with non-Lattice plots like \code{\link{persp}}).
 	  \item \code{c("brush", "brush.region", "brush.drag", "clear")} will be added to \code{\link[lattice]{splom}} 
 	  (note, these do not yet work with non-Lattice plots like \code{\link{pairs}}).
   }
+  unless \code{buttons} is given explicitly.
+  
   See \code{\link{plotAndPlayButtons}} if you want to define new buttons.
   
   The interaction features require that all variables appearing in the plot call remain accessible:
@@ -91,7 +94,7 @@ playwith(expr, name = "plot", nav.scales = c("x","y"), trans.scales = c("y"),
 \dontrun{
 
 ## `playwith` a base graphics plot: interaction and annotation
-## from example(plot.default)
+## -- from example(plot.default)
 playwith(plot(cars$speed, cars$dist, xlab = "Speed", ylab = "Distance",
          panel.first = lines(lowess(cars$speed, cars$dist), lty = "dashed"),
          pch = 0, cex = 1.2, col = "blue"))
@@ -102,7 +105,7 @@ require(lattice)
 playwith(xyplot(Income ~ Population / Area | state.region, 
 	data=data.frame(state.x77)))
 
-## same plot with 2 pages (2 panels per page)
+## same plot with 2 pages (2 panels per page); new plot window
 playwith(xyplot(Income ~ Population / Area | state.region, 
 	data=data.frame(state.x77), layout=c(2,1)), name="other")
 
@@ -131,8 +134,21 @@ playwith(splom(environmental))
 ## simple spin and zoom for 3D plots
 playwith(wireframe(volcano, drape=TRUE))
 
-## a code chunk: no interaction, only annotation, save to file, etc
-## from example(plot.default)
+## example of the 'layers' button with a panel function
+## -- from example(xyplot)
+EE <- equal.count(ethanol$E, number=9, overlap=1/4)
+playwith(xyplot(NOx ~ C | EE, data = ethanol,
+       prepanel = function(x, y) prepanel.loess(x, y, span = 1),
+       xlab = "Compression Ratio", ylab = "NOx (micrograms/J)",
+       panel = function(x, y) {
+           panel.grid(h=-1, v= 2)
+           panel.xyplot(x, y)
+           panel.loess(x,y, span=1)
+       },
+       aspect = "xy"))
+
+## a code chunk: no interaction, only annotation, saving, etc
+## -- from example(plot.default)
 x <- 0:12
 y <- sin(pi/5 * x)
 playwith({

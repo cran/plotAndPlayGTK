@@ -23,6 +23,7 @@
 \alias{.plotAndPlay_annotate_event}
 \alias{.plotAndPlay_edit_in_place_event}
 \alias{.plotAndPlay_edit_event}
+\alias{.plotAndPlay_layers_event}
 \alias{.plotAndPlay_zoomin3d_event}
 \alias{.plotAndPlay_zoomout3d_event}
 \alias{.plotAndPlay_flyleft3d_event}

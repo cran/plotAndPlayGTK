@@ -7,7 +7,7 @@ A text field in a dialog box.
 \usage{
 guiTextInput(text = "", title = "Text Input", prompt = "", oneLiner = F, 
              accepts.tab = T, wrap.mode = c("none", "char", "word", "word_char"), 
-             size = c(640, 400), width.chars = -1, focus.on.ok = !oneLiner)
+             size = c(550, 320), width.chars = -1, focus.on.ok = !oneLiner)
 }
 \arguments{
   \item{text}{ initial text to put in the text box. }
