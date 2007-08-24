@@ -1,7 +1,7 @@
 ## plotAndPlayGTK: interactive plots in R using GTK+
 ##
 ## Copyright (c) 2007 Felix Andrews <felix@nfrac.org>
-## with contributions from Deepayan Sarkar and Graham Williams
+## with contributions from Graham Williams
 ## GPL version 2 or newer
 
 plotAndPlayButtons <- alist(
@@ -16,6 +16,7 @@ plotAndPlayButtons <- alist(
 	zero=quickTool("Full scale", "gtk-goto-bottom", tooltip="Show the full scale starting from zero", f=.plotAndPlay_zero_event, isToggle=T),
 	logscale=quickTool("Log scale", "gtk-goto-top", tooltip="Use a logarithmic scale (base 10)", f=.plotAndPlay_logscale_event, isToggle=T),
 	layers=makeLayersMenuButton(),
+	index=makeIndexButton(),
 	brush=quickTool("Brush points", "gtk-media-record", f=.plotAndPlay_brush_event),
 	brush.region=quickTool("Brush region", "gtk-media-record", f=.plotAndPlay_brush_region_event),
 	brush.drag=quickTool("Brush region (drag)", "gtk-media-record", f=.plotAndPlay_brush_drag_event),
@@ -28,9 +29,9 @@ plotAndPlayButtons <- alist(
 	#fly.down.3d=quickTool("Fly down", "gtk-go-down", f=.plotAndPlay_flydown3d_event),
 	focus=quickTool("Choose panel", "gtk-select-color", tooltip="Choose a panel to focus on (for further interaction)", f=.plotAndPlay_focus_event),
 	expand=quickTool("Expand panel", "gtk-fullscreen", tooltip="Choose a panel to expand and focus (for further interaction)", f=.plotAndPlay_expand_event, isToggle=T),
+	pages=makePagesWidget(),
 	prev.page=quickTool("Prev page", "gtk-go-back-ltr", f=.plotAndPlay_prevpage_event),
-	next.page=quickTool("Next page", "gtk-go-forward-ltr", f=.plotAndPlay_nextpage_event),
-	edit=quickTool("Edit call", "gtk-italic", tooltip="Edit the plot call as text", f=.plotAndPlay_edit_event)
+	next.page=quickTool("Next page", "gtk-go-forward-ltr", f=.plotAndPlay_nextpage_event)
 )
 
 plotAndPlayBasicButtons <- alist(
@@ -198,11 +199,11 @@ makeLayersMenuButton <- function() {
 		}
 	} else if ('panel' %in% names(the.call)) {
 		layerType <- "panel"
-		# store evaluated panel function in call
-		StateEnv[[name]]$call$panel <- eval(the.call$panel, StateEnv[[name]]$env)
-		panelBody <- body(StateEnv[[name]]$call$panel)
-		# treat any call to panel.* or grid.* as a layer
-		r.grep.call <- function(x, pattern="^panel\\.|^grid\\.", indexPath=NULL) {
+		# skip if this is not an inline function
+		if (is.symbol(the.call$panel)) return(NA)
+		panelBody <- body(eval(the.call$panel, StateEnv[[name]]$env))
+		# treat any call to panel.* or grid.* or sp.* as a layer
+		r.grep.call <- function(x, pattern="^panel\\.|^grid\\.|^sp\\.", indexPath=NULL) {
 			stopifnot(is.call(x))
 			if (any(grep(pattern, deparse(x[[1]])[1]))) {
 				return(bquote(c(.(indexPath))))
@@ -217,17 +218,23 @@ makeLayersMenuButton <- function() {
 		itemIDsStr <- sapply(itemIDs, toIndexStr)
 		itemNames <- sapply(paste('panelBody',itemIDsStr,sep=''), 
 			function(s) deparse(eval(parse(text=s)))[1] )
-		# work out whether each item is quoted
+		# work out whether each item is turned off with `if (FALSE)`
 		itemStates <- rep(T, length(itemIDs))
 		drop_last <- function(xx) lapply(xx, function(x) 
 			if (length(x) > 1) x[-length(x)] else x)
 		itemParentIDsStr <- sapply(drop_last(itemIDs), toIndexStr)
 		itemStates <- sapply(paste('panelBody',itemParentIDsStr,sep=''), 
-			function(s) eval(parse(text=s))[[1]] != as.symbol("quote") )
+		function(s) { 
+			parentExpr <- eval(parse(text=s))
+			!(identical(parentExpr[[1]], as.symbol("if")) &&
+			identical(parentExpr[[2]], FALSE))
+		})
 		itemIDs[itemStates==F] <- drop_last(itemIDs[itemStates==F])
 		# tmp <- quote({ print(x); while (x) { print(panel.list('a','b')); x <- something(grid.lines()) } })
 	}
 	itemNames <- sapply(itemNames, toString, width=34)
+	# omit the button if only one layer
+	if (length(itemIDs) <= 1) return(NA)
 	# store layers info
 	StateEnv[[name]]$layers.names <- itemNames
 	StateEnv[[name]]$layers.ids <- itemIDs
@@ -246,6 +253,38 @@ makeLayersMenuButton <- function() {
 		data=list(menu=layersMenu, layerType=layerType))
 	layersButton
 }
+
+makePagesWidget <- function() {
+	name <- StateEnv$.current
+	spinner <- gtkSpinButton(min=1, max=9999, step=1)
+	spinner["value"] <- StateEnv[[name]]$page
+	sigID <- gSignalConnect(spinner, "value-changed", .plotAndPlay_pages_event)
+	StateEnv[[name]]$widget_pages_sig_id <- sigID
+	vbox <- gtkVBox()
+	vbox$packStart(gtkLabel("Page:"))
+	vbox$packStart(spinner)
+	foo <- gtkToolItem()
+	foo$add(vbox)
+	foo
+}
+
+makeIndexButton <- function() {
+	name <- StateEnv$.current
+	myStep <- 1
+	if ('gui.step' %in% names(StateEnv[[name]]$call))
+		myStep <- eval(StateEnv[[name]]$call$gui.step, StateEnv[[name]]$env)
+	spinner <- gtkSpinButton(min=1, max=999999, step=myStep)
+	spinner["value"] <- 1
+	StateEnv[[name]]$env$gui.index <- 1
+	gSignalConnect(spinner, "value-changed", .plotAndPlay_index_event)
+	vbox <- gtkVBox()
+	vbox$packStart(gtkLabel("Index:"))
+	vbox$packStart(spinner)
+	foo <- gtkToolItem()
+	foo$add(vbox)
+	foo
+}
+
 
 ##### BUTTON HANDLERS #####
 
@@ -344,9 +383,6 @@ makeLayersMenuButton <- function() {
 
 .plotAndPlay_greyscale_event <- function(widget, user.data) {
 	name <- StateEnv$.current
-	# disable other plot buttons until this is over
-	plotAndPlayGetToolbar()$setSensitive(F)
-	on.exit(plotAndPlayGetToolbar()$setSensitive(T))
 	# get new greyscale setting
 	greyscale <- widget$getActive()
 	# make change and re-draw plot
@@ -564,9 +600,9 @@ makeLayersMenuButton <- function() {
 	if (doExpand) {
 		# set up prompt
 		plotAndPlayMakePrompt()
-		on.exit(plotAndPlayUnmakePrompt(), add=T)
 		plotAndPlaySetPrompt("Click on a panel to expand (for further interaction)")
 		newFocus <- trellis.focus()
+		plotAndPlayUnmakePrompt()
 		if (!any(newFocus)) return()
 		StateEnv[[name]]$focus <- list(col=0, row=0)
 		StateEnv[[name]]$old.call.layout <- StateEnv[[name]]$call$layout
@@ -920,9 +956,6 @@ makeLayersMenuButton <- function() {
 	name <- StateEnv$.current
 	trans.x <- ("x" %in% StateEnv[[name]]$trans.scales)
 	trans.y <- ("y" %in% StateEnv[[name]]$trans.scales)
-	# disable other plot buttons until this is over
-	plotAndPlayGetToolbar()$setSensitive(F)
-	on.exit(plotAndPlayGetToolbar()$setSensitive(T))
 	# get new zero scale setting
 	zeroScale <- widget$getActive()
 	# make change and re-draw plot
@@ -969,9 +1002,6 @@ makeLayersMenuButton <- function() {
 	name <- StateEnv$.current
 	trans.x <- ("x" %in% StateEnv[[name]]$trans.scales)
 	trans.y <- ("y" %in% StateEnv[[name]]$trans.scales)
-	# disable other plot buttons until this is over
-	plotAndPlayGetToolbar()$setSensitive(F)
-	on.exit(plotAndPlayGetToolbar()$setSensitive(T))
 	# get new log scale setting
 	logScale <- widget$getActive()
 	# make change and re-draw plot
@@ -1168,6 +1198,9 @@ makeLayersMenuButton <- function() {
 	itemIdx <- user.data$index
 	itemID <- user.data$ID
 	layerType <- user.data$layerType
+	# disable other plot buttons until this is over
+	plotAndPlayGetToolbar()$setSensitive(F)
+	on.exit(plotAndPlayGetToolbar()$setSensitive(T))
 	
 	if (is.null(itemID)) {
 		menuItems <- user.data$menu$getChildren()
@@ -1208,11 +1241,14 @@ makeLayersMenuButton <- function() {
 			StateEnv[[name]]$call$sp.layout[[itemIdx]]$which <- 0
 		}
 	} else if (layerType == "panel") {
+		# make sure panel function in call has been evaluated
+		StateEnv[[name]]$call$panel <- eval(StateEnv[[name]]$call$panel, 
+			StateEnv[[name]]$env)
 		target <- paste('body(StateEnv[[name]]$call$panel)',toIndexStr(itemID),sep='')
 		if (isActive) {
-			cmd <- paste(target, " <- ", target, "[[2]]", sep='')
+			cmd <- paste(target, " <- ", target, "[[3]]", sep='')
 		} else {
-			cmd <- paste(target, "<- call('quote',", target, ")")
+			cmd <- paste(target, "<- call('if', FALSE,", target, ")")
 		}
 		eval(parse(text=cmd))
 	}
@@ -1271,6 +1307,18 @@ makeLayersMenuButton <- function() {
 .plotAndPlay_nextpage_event <- function(widget, user.data) {
 	name <- StateEnv$.current
 	StateEnv[[name]]$page <- StateEnv[[name]]$page + 1
+	plotAndPlayUpdate()
+}
+
+.plotAndPlay_pages_event <- function(widget, user.data) {
+	name <- StateEnv$.current
+	StateEnv[[name]]$page <- widget["value"]
+	plotAndPlayUpdate()
+}
+
+.plotAndPlay_index_event <- function(widget, user.data) {
+	name <- StateEnv$.current
+	StateEnv[[name]]$env$gui.index <- widget["value"]
 	plotAndPlayUpdate()
 }
 

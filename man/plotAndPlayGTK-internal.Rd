@@ -29,6 +29,7 @@
 \alias{.plotAndPlay_zoomout3d_event}
 \alias{.plotAndPlay_flyleft3d_event}
 \alias{.plotAndPlay_flyright3d_event}
+\alias{.plotAndPlay_index_event}
 \title{Internal plotAndPlayGTK user interface callbacks}
 \description{These are exported from the package so that the GUI can
   access the callbacks. They should otherwise be ignored.}

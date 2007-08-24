@@ -50,14 +50,14 @@ playwith(expr, name = "plot", nav.scales = c("x","y"), trans.scales = c("y"),
   Specifically: \itemize{
 	  \item \code{"expand"} will be added to lattice plots with more than one panel per page. 
 	  An alternative is \code{"focus"}, which is the same but does not expand the chosen panel to the full window.
-	  \item \code{c("prev.page", "next.page")} will be added to lattice plots with more than one page.
+	  \item \code{"pages"} will be added to lattice plots with more than one page.
 	  \item \code{"layers"} will be added to lattice plots with any of the arguments \code{"layers", "sp.layout", "panel"}.
 	  \item \code{c("zoomin.3d", "zoomout.3d", "fly.left.3d", "fly.right.3d")} will be added to \code{\link[lattice]{wireframe}} and \code{\link[lattice]{cloud}} 
 	  (note, these do not yet work with non-Lattice plots like \code{\link{persp}}).
 	  \item \code{c("brush", "brush.region", "brush.drag", "clear")} will be added to \code{\link[lattice]{splom}} 
 	  (note, these do not yet work with non-Lattice plots like \code{\link{pairs}}).
   }
-  unless \code{buttons} is given explicitly.
+  But these may be overridden by specifying \code{buttons} explicitly.
   
   See \code{\link{plotAndPlayButtons}} if you want to define new buttons.
   
@@ -99,18 +99,20 @@ playwith(plot(cars$speed, cars$dist, xlab = "Speed", ylab = "Distance",
          panel.first = lines(lowess(cars$speed, cars$dist), lty = "dashed"),
          pch = 0, cex = 1.2, col = "blue"))
 
+# you might get an error "Plot margins too small"; make window bigger and repeat
+
 require(lattice)
 
 ## multiple lattice panels; identify points with nice labels
-playwith(xyplot(Income ~ Population / Area | state.region, 
+playwith(xyplot(Income ~ log(Population / Area) | state.region, 
 	data=data.frame(state.x77)))
 
 ## same plot with 2 pages (2 panels per page); new plot window
-playwith(xyplot(Income ~ Population / Area | state.region, 
+playwith(xyplot(Income ~ log(Population / Area) | state.region, 
 	data=data.frame(state.x77), layout=c(2,1)), name="other")
 
 ## time series plot: navigate x-axis only, transform y-axis
-treering2 <- window(treering, 0, 1979)
+treering2 <- window(treering, 1, 1979)
 playwith(plot(treering2), nav.scales="x", trans.scales="y", 
 	labels=paste(time(treering2),"CE"), 
 	extra.buttons=list("logscale"))

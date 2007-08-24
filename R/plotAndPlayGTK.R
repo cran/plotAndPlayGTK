@@ -1,15 +1,15 @@
 ## plotAndPlayGTK: interactive plots in R using GTK+
 ##
 ## Copyright (c) 2007 Felix Andrews <felix@nfrac.org>
-## with contributions from Deepayan Sarkar and Graham Williams
+## with contributions from Graham Williams
 ## GPL version 2 or newer
 
 MAJOR <- "0"
 MINOR <- "8"
-REVISION <- unlist(strsplit("$Revision: 60 $", split=" "))[2]
+REVISION <- unlist(strsplit("$Revision: 64 $", split=" "))[2]
 VERSION <- paste(MAJOR, MINOR, REVISION, sep=".")
 COPYRIGHT <- paste("(c) 2007 Felix Andrews <felix@nfrac.org>",
-	"with contributions from Deepayan Sarkar and Graham Williams")
+	"with contributions from Graham Williams")
 WEBSITE <- "http://code.google.com/p/plotandplay-gtk/"
 
 ## LICENSE
@@ -32,6 +32,16 @@ if (!exists("StateEnv", environment(), inherits=FALSE)) {
 	StateEnv <- new.env()
 }
 
+#button to go into nav mode?
+
+#gtkEntry with time; gtkCalendar in a gtkDialog
+#gtkHScrollbar(adjustment)
+#makeScrollbarTool <- function()
+#gtkAdjustment(value = NULL, lower = NULL, upper = NULL, step.incr = NULL, page.incr = NULL, page.size = NULL) 
+#setUpdatePolicy(GtkUpdateType["discontinuous"])
+
+# hide 'fit data' button if [xy]lim is NULL?
+
 # trellis.focus("panel", 1, 1, highlight=F)
 # which(trellis.currentLayout() > 0)[1]
 # okPanel <- which(trellis.currentLayout() > 0, arr.ind=T)[1,]
@@ -48,7 +58,6 @@ if (!exists("StateEnv", environment(), inherits=FALSE)) {
 # gtkFontButton
 
 #gdkPixbufGetFromDrawable(dest = NULL, src, cmap = NULL, src.x, src.y, dest.x, dest.y, width, height)
-#"gtk-index" (layers)
 # TODO: xlim / ylim list if scales$relation %in% c("free", "sliced")
 
 latticeNames <- c("barchart", "bwplot", "cloud", "contourplot", "densityplot", 
@@ -195,7 +204,7 @@ plotAndPlayInit <- function() {
 	argfoo <- StateEnv[[name]]$.args
 	attach(argfoo)
 	on.exit(detach(argfoo))
-	labels <- argfoo$labels # this seems to be masked by base package?
+	labels <- argfoo$labels # otherwise can be masked by base package?
 	buttons <- argfoo$buttons
 	# put call into canonical form
 	callFun <- eval(plot.call[[1]], env)
@@ -301,27 +310,16 @@ plotAndPlayInit <- function() {
 		if (missing_buttons) buttons <- c(buttons, list("layers"))
 	}
 	buttons <- c(buttons, extra.buttons)
-	# work out panels and pages
 	if (is.lattice) {
-		# need to eval it to compute trellis object
-		result <- eval(plot.call, env)
-		nPanels <- prod(dim(result))
-		nPerPage <- nPanels
-		nPages <- 1
-		myLayout <- eval(plot.call$layout, env)
-		if (!is.null(myLayout)) {
-			nPerPage <- myLayout[1] * myLayout[2]
-			if (myLayout[1] == 0) nPerPage <- myLayout[2]
-			nPages <- ceiling(nPanels / nPerPage)
-			if (nPages > 1) {
-				buttons <- c(buttons, "prev.page", "next.page")
-			}
-			# needed for page navigation (packet.panel.page)
-			myLayout[3] <- 1
-			plot.call$layout <- myLayout
-		}
-		if (nPerPage > 1) buttons <- c(buttons, "expand")
-		if (StateEnv[[name]]$page > nPages) StateEnv[[name]]$page <- 1
+		# these are always added to the toolbar as non-visible
+		# they will be show()n only when relevant (see plotAndPlayUpdate)
+		widget_expand <- eval(plotAndPlayButtons[["expand"]])
+		widget_pages <- eval(plotAndPlayButtons[["pages"]])
+		widget_expand$hide()
+		widget_pages$hide()
+		StateEnv[[name]]$widget_expand <- widget_expand
+		StateEnv[[name]]$widget_pages <- widget_pages
+		buttons <- c(buttons, widget_expand, widget_pages)
 	}
 	if (!is.lattice) basic.buttons$greyscale <- NULL
 	if (length(buttons) > 0) buttons <- c(buttons, gtkSeparatorToolItem())
@@ -339,6 +337,7 @@ plotAndPlayInit <- function() {
 			}
 		})
 		if (inherits(tryResult, "try-error")) next
+		if (identical(newButton, NA)) next
 		if (is.null(newButton)) {
 			stop("Unrecognised (NULL) button at position ", i)
 		}
@@ -407,14 +406,42 @@ plotAndPlayDoFocus <- function(highlight=T, ...) {
 
 plotAndPlayUpdate <- function() {
 	name <- StateEnv$.current
+	# disable other plot buttons until this is over
+	plotAndPlayGetToolbar()$setSensitive(F)
+	on.exit(plotAndPlayGetToolbar()$setSensitive(T))
+	StateEnv[[name]]$win$getWindow()$setCursor(gdkCursorNew("watch"))
+	on.exit(StateEnv[[name]]$win$getWindow()$setCursor(NULL), add=T)
 	# add current call to text box
-	callTxt <- deparseOneLine(StateEnv[[name]]$call, control="showAttributes")
+	callTxt <- ""
+	if (object.size(StateEnv[[name]]$call) < 50000)
+		callTxt <- deparseOneLine(StateEnv[[name]]$call, control="showAttributes")
 	plotAndPlayGetCallEntry()$setText(callTxt)
-	#plotAndPlayGetCallEntry()$setPosition(0)
 	if (isTRUE(StateEnv[[name]]$skip.updates)) return()
 	# do the plot
 	result <- eval(StateEnv[[name]]$call, StateEnv[[name]]$env)
 	if (inherits(result, "trellis")) {
+		# work out panels and pages
+		nPanels <- prod(dim(result))
+		panelsPerPage <- nPanels
+		nPages <- 1
+		if (!is.null(myLayout <- result$layout)) {
+			panelsPerPage <- myLayout[1] * myLayout[2]
+			if (myLayout[1] == 0) panelsPerPage <- myLayout[2]
+			nPages <- ceiling(nPanels / panelsPerPage)
+			result$layout[3] <- 1
+		}
+		if (nPages > 1) 
+			StateEnv[[name]]$widget_pages$show() else 
+			StateEnv[[name]]$widget_pages$hide()
+		if (panelsPerPage > 1 || StateEnv[[name]]$widget_expand['active'])
+			StateEnv[[name]]$widget_expand$show() else
+			StateEnv[[name]]$widget_expand$hide()
+		spinner <- StateEnv[[name]]$widget_pages$getChildren()[[1]]$getChildren()[[2]]
+		if (StateEnv[[name]]$page > nPages) StateEnv[[name]]$page <- 1
+		spinner['adjustment']['upper'] <- nPages
+		gSignalHandlerBlock(spinner, StateEnv[[name]]$widget_pages_sig_id)
+		spinner['value'] <- StateEnv[[name]]$page
+		gSignalHandlerUnblock(spinner, StateEnv[[name]]$widget_pages_sig_id)
 		# plot trellis object
 		curPage <- StateEnv[[name]]$page
 		print(result, packet.panel=packet.panel.page(curPage))
@@ -770,8 +797,12 @@ toIndexStr <- function(x) paste('[[', x ,']]', sep='', collapse='')
 
 deparseOneLine <- function(expr, width.cutoff=500, ...) {
 	tmp <- deparse(expr, width.cutoff=width.cutoff, ...)
-	tmp <- paste(tmp, collapse=";")
-	tmp <- gsub("; +", "; ", tmp)
+	indents <- attr(regexpr("^ *", tmp), "match.length")
+	breaks <- c(diff(indents) <= 0, FALSE)
+	tmp <- gsub("^ +", "", tmp)
+	tmp <- gsub(" +$", "", tmp)
+	breaks[c(tmp[-1]=="{", FALSE)] <- F
+	tmp <- paste(tmp, ifelse(breaks, ";", ""), sep="", collapse=" ")
 	tmp <- gsub("\\{;", "\\{", tmp)
 	tmp <- gsub(";\\}", " \\}", tmp)
 	tmp <- gsub(";\\{", " \\{", tmp)
