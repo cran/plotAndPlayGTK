@@ -16,6 +16,7 @@
 \alias{.plotAndPlay_nextpage_event}
 \alias{.plotAndPlay_identify_event}
 \alias{.plotAndPlay_identify_region_event}
+\alias{.plotAndPlay_identify_setstyle_event}
 \alias{.plotAndPlay_brush_event}
 \alias{.plotAndPlay_brush_region_event}
 \alias{.plotAndPlay_brush_drag_event}

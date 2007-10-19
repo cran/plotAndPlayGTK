@@ -42,6 +42,20 @@ playwith(expr, name = "plot", nav.scales = c("x","y"), trans.scales = c("y"),
   \item{restore.on.close}{ a \code{gtkWindow} to bring to front when the plot window is closed. }
 }
 \details{
+  This function generates a general-purpose graphical user interface for R plots.
+  It tries to work out what kind of plot it is, and how you might want to interact with it.
+  This is based firstly on whether the plot function name is recognised as a Lattice plot or not.
+  If it is a not a standard high-level function you may need \code{is.lattice=T}.
+  
+  In order for the plot to be modified, its supporting data needs to be stored.
+  By default, all non-global data is copied into an attached environment and stored.
+  More on this below.
+  
+  This function will also try to guess labels for data points. 
+  It does this by evaluating the \code{x} argument (\code{data} argument for Lattice plots), 
+  or part of the formula. To suppress this evaluation, give \code{labels} explicitly 
+  (may be \code{labels=NA}).
+  
   Each element of \code{buttons} should be a call to generate a \code{\link[RGtk2]{gtkToolItem}} 
   (typically a \code{\link[RGtk2]{gtkToolButton}}),
   or text, in which case it is taken from the pre-defined set.
@@ -51,7 +65,7 @@ playwith(expr, name = "plot", nav.scales = c("x","y"), trans.scales = c("y"),
 	  \item \code{"expand"} will be added to lattice plots with more than one panel per page. 
 	  An alternative is \code{"focus"}, which is the same but does not expand the chosen panel to the full window.
 	  \item \code{"pages"} will be added to lattice plots with more than one page.
-	  \item \code{"layers"} will be added to lattice plots with any of the arguments \code{"layers", "sp.layout", "panel"}.
+	  \item \code{"layers"} might be added to lattice plots with any of the arguments \code{"layers", "sp.layout", "panel"}.
 	  \item \code{c("zoomin.3d", "zoomout.3d", "fly.left.3d", "fly.right.3d")} will be added to \code{\link[lattice]{wireframe}} and \code{\link[lattice]{cloud}} 
 	  (note, these do not yet work with non-Lattice plots like \code{\link{persp}}).
 	  \item \code{c("brush", "brush.region", "brush.drag", "clear")} will be added to \code{\link[lattice]{splom}} 
@@ -89,7 +103,8 @@ playwith(expr, name = "plot", nav.scales = c("x","y"), trans.scales = c("y"),
 	(which for lattice plots is a \code{\link[=print.trellis]{trellis}} object).
 }
 \author{ Felix Andrews \email{felix@nfrac.org} }
-\seealso{ \code{\link{plotAndPlayButtons}}, \code{\link[lattice]{xyplot}}, \link[lattice]{Lattice} }
+\seealso{ \code{\link{setAutoPlaywith}}, \code{\link{plotAndPlayButtons}}, 
+	\code{\link[lattice]{xyplot}}, \link[lattice]{Lattice} }
 \examples{
 \dontrun{
 
@@ -109,16 +124,16 @@ playwith(xyplot(Income ~ log(Population / Area) | state.region,
 
 ## same plot with 2 pages (2 panels per page); new plot window
 playwith(xyplot(Income ~ log(Population / Area) | state.region, 
-	data=data.frame(state.x77), layout=c(2,1)), name="other")
+	data=data.frame(state.x77), layout=c(2,1)), name="other plot")
 
 ## time series plot: navigate x-axis only, transform y-axis
-treering2 <- window(treering, 1, 1979)
+treering2 <- window(treering, start=1)
 playwith(plot(treering2), nav.scales="x", trans.scales="y", 
 	labels=paste(time(treering2),"CE"), 
 	extra.buttons=list("logscale"))
 
 ## see what the current call is (for last focused plot window)
-plotAndPlayGetCurrState()$call
+plotAndPlayGetState()$call
 
 ## example of evaluating and storing arguments in the plot call
 globalOne <- 1:10
@@ -128,7 +143,7 @@ localStuff <- function() {
 }
 localStuff()
 ## see which objects have been copied and stored with the plot
-sapply(plotAndPlayGetCurrState()$env, object.size)
+sapply(plotAndPlayGetState()$env, object.size)
 
 ## brushing multivariate scatterplots, see help(panel.brush.splom)
 playwith(splom(environmental))

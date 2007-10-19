@@ -1,7 +1,6 @@
 ## plotAndPlayGTK: interactive plots in R using GTK+
 ##
 ## Copyright (c) 2007 Felix Andrews <felix@nfrac.org>
-## with contributions from Graham Williams
 ## GPL version 2 or newer
 
 plotAndPlayButtons <- alist(
@@ -98,11 +97,14 @@ makeIdentifyMenuButton <- function() {
 	gSignalConnect(idButton, "clicked", .plotAndPlay_identify_event)
 	idMenu <- gtkMenu()
 	itemRegion <- gtkMenuItem("Identify all points in a region")
+	itemStyle <- gtkMenuItem("Set label style...")
 	itemClear <- gtkMenuItem("Clear labels")
 	idMenu$append(itemRegion)
+	idMenu$append(itemStyle)
 	idMenu$append(itemClear)
 	idButton$setMenu(idMenu)
 	gSignalConnect(itemRegion, "activate", .plotAndPlay_identify_region_event)
+	gSignalConnect(itemStyle, "activate", .plotAndPlay_identify_setstyle_event)
 	gSignalConnect(itemClear, "activate", .plotAndPlay_clear_event,
 		data=list(types="ids"))
 	idButton
@@ -627,6 +629,7 @@ makeIndexButton <- function() {
 	on.exit(plotAndPlayUnmakePrompt(), add=T)
 	# do identify
 	idCall <- StateEnv[[name]]$id.call
+	idCall <- as.call(c(as.list(idCall), StateEnv[[name]]$label.args))
 	if (!StateEnv[[name]]$is.lattice) {
 		# traditional graphics plot
 		plotAndPlaySetPrompt(paste("Identifying data points...",
@@ -756,6 +759,32 @@ makeIndexButton <- function() {
 		StateEnv[[name]]$ids$all <- union(ids.old, ids.new)
 	}
 	plotAndPlayUpdate()
+}
+
+.plotAndPlay_identify_setstyle_event <- function(widget, user.data) {
+	name <- StateEnv$.current
+	argsCall <- as.call(c(quote(list), StateEnv[[name]]$label.args))
+	callTxt <- deparseOneLine(argsCall)
+	
+	# panel.text: cex, col, alpha, font, fontfamily, fontface, srt
+	# text: cex, col, font, vfont, family, xpd, srt (90,180,270)
+	repeat {
+		newTxt <- guiTextInput(callTxt, title="Edit label style", 
+			oneLiner=T, width.chars=54)
+		if (is.null(newTxt)) break
+		if (identical(newTxt, callTxt)) break
+		callTxt <- newTxt
+		tmp <- tryCatch(parse(text=callTxt), error=function(e)e)
+		# check whether there was a syntax error
+		if (inherits(tmp, "error")) {
+			errorDialog(paste("Error:", conditionMessage(tmp)))
+		} else {
+			StateEnv[[name]]$label.args <- eval(tmp)
+			plotAndPlayUpdate()
+			break
+		}
+	}
+	StateEnv[[name]]$win$present()
 }
 
 .plotAndPlay_brush_event <- function(widget, user.data) {
@@ -1061,7 +1090,7 @@ makeIndexButton <- function() {
 			clickLoc1 <- lapply(clickLoc1, as.numeric)
 			clickLoc1 <- lapply(clickLoc1, signif, 4)
 			theCall <- call('panel.arrows', x0=clickLoc$x, y0=clickLoc$y,
-				x1=clickLoc1$x, y1=clickLoc1$y, length=0.2)
+				x1=clickLoc1$x, y1=clickLoc1$y, length=0.15)
 		} else {
 			myLabel <- placeLabelDialog()
 			if (is.null(myLabel)) return()
@@ -1088,7 +1117,7 @@ makeIndexButton <- function() {
 			if (is.null(clickLoc1)) return()
 			clickLoc1 <- lapply(clickLoc1, signif, 4)
 			theCall <- call('arrows', x0=clickLoc$x, y0=clickLoc$y,
-				x1=clickLoc1$x, y1=clickLoc1$y, length=0.2)
+				x1=clickLoc1$x, y1=clickLoc1$y, length=0.15)
 		} else {
 			myLabel <- placeLabelDialog()
 			if (is.null(myLabel)) return()
@@ -1121,7 +1150,7 @@ makeIndexButton <- function() {
 	on.exit(plotAndPlayGetToolbar()$setSensitive(T))
 	theAnnots <- StateEnv[[name]]$annotations$all
 	callTxt <- paste(unlist(lapply(theAnnots, deparse, 
-		control=c("showAttributes"), width=50)), collapse="\n")
+		control=c("showAttributes"))), collapse="\n")
 	repeat {
 		newTxt <- guiTextInput(callTxt, title="Edit annotations", 
 			prompt="", accepts.tab=F)
@@ -1170,8 +1199,8 @@ makeIndexButton <- function() {
 	plotAndPlayGetToolbar()$setSensitive(F)
 	on.exit(plotAndPlayGetToolbar()$setSensitive(T))
 	theCall <- StateEnv[[name]]$call
-	callTxt <- paste(deparse(theCall, control=c("showAttributes"),
-		width=50), collapse="\n")
+	callTxt <- paste(deparse(theCall, control=c("showAttributes")), 
+		collapse="\n")
 	repeat {
 		newTxt <- guiTextInput(callTxt, title="Edit plot call", 
 			prompt="", accepts.tab=F)

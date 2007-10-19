@@ -1,16 +1,14 @@
 ## plotAndPlayGTK: interactive plots in R using GTK+
 ##
 ## Copyright (c) 2007 Felix Andrews <felix@nfrac.org>
-## with contributions from Graham Williams
 ## GPL version 2 or newer
 
 MAJOR <- "0"
 MINOR <- "8"
-REVISION <- unlist(strsplit("$Revision: 64 $", split=" "))[2]
+REVISION <- unlist(strsplit("$Revision: 72 $", split=" "))[2]
 VERSION <- paste(MAJOR, MINOR, REVISION, sep=".")
-COPYRIGHT <- paste("(c) 2007 Felix Andrews <felix@nfrac.org>",
-	"with contributions from Graham Williams")
-WEBSITE <- "http://code.google.com/p/plotandplay-gtk/"
+COPYRIGHT <- "(c) 2007 Felix Andrews <felix@nfrac.org>"
+WEBSITE <- "http://plotandplay-gtk.googlecode.com/"
 
 ## LICENSE
 ##
@@ -64,7 +62,7 @@ latticeNames <- c("barchart", "bwplot", "cloud", "contourplot", "densityplot",
 	"dotplot", "histogram", "levelplot", "parallel", "qq", "qqmath", "rfs", 
 	"splom", "stripplot", "tmd", "wireframe", "xyplot",
 	# packages sp and latticeExtra
-	"spplot", "bubble", "gplot", "ecdfplot", "rootogram")
+	"spplot", "bubble", "mapplot", "gplot", "ecdfplot", "rootogram")
 
 playwith <- function(expr, name="plot", nav.scales=c("x","y"), trans.scales=c("y"), 
 	buttons=list("annotate", "identify", "zoom", "zoomfit"), 
@@ -107,6 +105,7 @@ playwith <- function(expr, name="plot", nav.scales=c("x","y"), trans.scales=c("y
 	# check whether the window already exists
 	if (is.null(StateEnv[[name]]$win) 
 	|| (inherits(StateEnv[[name]]$win, "<invalid>"))) {
+		StateEnv[[name]] <- list()
 		# create a new GTK window and set up cairoDevice for plotting
 		myWin <- gtkWindow(show=FALSE)
 		if (!inherits(myWin, "GtkWindow")) stop(paste(
@@ -116,7 +115,7 @@ playwith <- function(expr, name="plot", nav.scales=c("x","y"), trans.scales=c("y
 			"See http://www.ggobi.org/rgtk2/"))
 		myWin["default-width"] <- 640
 		myWin["default-height"] <- 480
-		myWin["title"] <- paste("plotAndPlay:", name)
+		myWin["title"] <- name
 		gSignalConnect(myWin, "delete-event", 
 			.plotAndPlay_close_event, data=list(name=name))
 		myWin$show()
@@ -283,7 +282,6 @@ plotAndPlayInit <- function() {
 			if (!is.null(labels)) identify.call$labels <- labels
 		}
 	}
-	identify.call <- as.call(c(as.list(identify.call), StateEnv[[name]]$label.args))
 	# put identify call into canonical form
 	identify.call <- match.call(eval(identify.call[[1]], env), identify.call)
 	# set which buttons are visible
@@ -347,10 +345,7 @@ plotAndPlayInit <- function() {
 
 .plotAndPlay_window_focus_in_event <- function(widget, event, user.data) {
 	name <- user.data$name
-	StateEnv$.current <- name
-	# switch to this device
-	StateEnv[[name]]$old.dev <- dev.cur()
-	dev.set(StateEnv[[name]]$dev)
+	plotAndPlaySetCurrID(name)
 	return(FALSE)
 }
 
@@ -375,17 +370,49 @@ plotAndPlayInit <- function() {
 		try(StateEnv[[name]]$restore.on.close$present())
 	}
 	rm(list=name, envir=StateEnv)
+	if (length(others <- ls(StateEnv))) StateEnv$.current <- others[1]
 }
 
-plotAndPlayGetCurrState <- function() {
-	name <- StateEnv$.current
+plotAndPlayGetState <- function(item=NULL, name=plotAndPlayGetCurrID()) {
+	stopifnot(name %in% ls(StateEnv))
+	if (!is.null(item)) return(StateEnv[[name]][[item]])
+	# otherwise return the whole list
 	StateEnv[[name]]
 }
 
-plotAndPlaySetCurrState <- function(state) {
+plotAndPlaySetState <- function(..., name=plotAndPlayGetCurrID()) {
+	stopifnot(name %in% ls(StateEnv))
+	dots <- list(...)
+	if (length(dots) != 1) stop("give one object.")
+	state <- dots[[1]]
+	item <- names(dots)
+	if (is.null(item)) {
+		stopifnot(is.list(state))
+		stopifnot(c("win","dev","call","env") %in% names(state))
+		StateEnv[[name]] <- state
+	} else {
+		StateEnv[[name]][[item]] <- state
+	}
+	invisible()
+}
+
+plotAndPlayGetCurrState <- plotAndPlayGetState
+plotAndPlaySetCurrState <- plotAndPlaySetState
+
+plotAndPlayGetCurrID <- function() {
 	name <- StateEnv$.current
-	StateEnv[[name]] <- state
-	invisible(NULL)
+	if (!(name %in% ls(StateEnv))) stop("There is no active plot.")
+	StateEnv$.current
+}
+
+plotAndPlaySetCurrID <- function(name) {
+	if (!(name %in% ls(StateEnv)))
+		stop(dQuote(name), " is not the one of the current plots: ",
+			paste(dQuote(ls(StateEnv)), sep=", "))
+	StateEnv$.current <- name
+	# switch to this device
+	StateEnv[[name]]$old.dev <- dev.cur() # unused
+	dev.set(StateEnv[[name]]$dev)
 }
 
 # returns the new focus (col, row), which may be (0, 0), NULL if user cancelled
@@ -413,8 +440,12 @@ plotAndPlayUpdate <- function() {
 	on.exit(StateEnv[[name]]$win$getWindow()$setCursor(NULL), add=T)
 	# add current call to text box
 	callTxt <- ""
-	if (object.size(StateEnv[[name]]$call) < 50000)
-		callTxt <- deparseOneLine(StateEnv[[name]]$call, control="showAttributes")
+	if (object.size(StateEnv[[name]]$call) < 50000) {
+		callTxt <- deparseOneLine(StateEnv[[name]]$call, 
+			control="showAttributes")
+		if (name == "plot") StateEnv[[name]]$win["title"] <- 
+			toString(callTxt, width=34)
+	}
 	plotAndPlayGetCallEntry()$setText(callTxt)
 	if (isTRUE(StateEnv[[name]]$skip.updates)) return()
 	# do the plot
@@ -444,7 +475,7 @@ plotAndPlayUpdate <- function() {
 		gSignalHandlerUnblock(spinner, StateEnv[[name]]$widget_pages_sig_id)
 		# plot trellis object
 		curPage <- StateEnv[[name]]$page
-		print(result, packet.panel=packet.panel.page(curPage))
+		plot(result, packet.panel=packet.panel.page(curPage))
 		packets <- trellis.currentLayout(which="packet")
 		# draw persistent brushing
 		for (myPacket in names(StateEnv[[name]]$brushed)) {
@@ -822,6 +853,37 @@ deviceNPCToVp <- function(pos, unit="native", valueOnly=FALSE) {
 	location <- unit(location/location[3], "inches")
 	list(x=convertX(location[1], unit, valueOnly=valueOnly), 
 		y=convertY(location[2], unit, valueOnly=valueOnly))
+}
+
+playwith.trellis <- 
+   function(x, position = NULL, split = NULL, more = FALSE, newpage = TRUE,
+            packet.panel = packet.panel.default, draw.in = NULL, ...)
+{
+   dev.interactive2 <- function(orNone)
+   {
+       dev.interactive(orNone) ||
+       (interactive() && .Device == "null device" &&
+        getOption("device") == "Cairo")
+   }
+   #dots <- list(...)
+   #new <- (any(dots$new) && is.null(dots$draw) &&
+   new <- (newpage && is.null(draw.in) &&
+           !lattice:::lattice.getStatus("print.more"))
+   if (dev.interactive2(TRUE) && new) {
+       ## starting a new plot on an interactive device
+       eval.parent(call("playwith", x$call), n=2)
+       return(invisible())
+   }
+   ## call `plot.trellis` from lattice package, as usual
+   ocall <- sys.call()
+   ocall[[1]] <- quote(plot)
+   eval.parent(ocall)
+}
+
+setAutoPlaywith <- function(on=TRUE)
+{
+   library("lattice") # requires lattice >= 0.17-1
+   lattice.options(print.function = if (on) playwith.trellis else NULL)
 }
 
 ## The following functions by Deepayan Sarkar <Deepayan.Sarkar@R-project.org>

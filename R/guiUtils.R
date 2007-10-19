@@ -1,6 +1,6 @@
 ## plotAndPlayGTK: interactive plots in R using GTK+
 ##
-## Copyright (c) 2007 Felix Andrews <felix@nfrac.org> and others
+## Copyright (c) 2007 Felix Andrews <felix@nfrac.org>
 ## GPL version 2 or newer
 ##
 ## Some of these functions are based on ones in Rattle v2.1
