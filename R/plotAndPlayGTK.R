@@ -5,7 +5,7 @@
 
 MAJOR <- "0"
 MINOR <- "8"
-REVISION <- unlist(strsplit("$Revision: 72 $", split=" "))[2]
+REVISION <- unlist(strsplit("$Revision: 78 $", split=" "))[2]
 VERSION <- paste(MAJOR, MINOR, REVISION, sep=".")
 COPYRIGHT <- "(c) 2007 Felix Andrews <felix@nfrac.org>"
 WEBSITE <- "http://plotandplay-gtk.googlecode.com/"
